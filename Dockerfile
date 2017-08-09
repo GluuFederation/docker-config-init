@@ -31,18 +31,8 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY entrypoint.py ./
-
-RUN mkdir -p /opt/config-init/templates
-COPY templates/oxasimba-config.json /opt/config-init/templates/
-COPY templates/oxauth-config.json /opt/config-init/templates/
-COPY templates/oxauth-errors.json /opt/config-init/templates/
-COPY templates/oxauth-static-conf.json /opt/config-init/templates/
-COPY templates/oxcas-config.json /opt/config-init/templates/
-COPY templates/oxidp-config.json /opt/config-init/templates/
-# COPY templates/oxtrust-cache-refresh.json /opt/config-init/templates/
-# COPY templates/oxtrust-config.json /opt/config-init/templates/
-# COPY templates/oxtrust-import-person.json /opt/config-init/templates/
-COPY templates/passport-config.json /opt/config-init/templates/
+COPY templates ./templates
+COPY static ./static
 
 RUN mkdir -p /etc/certs
 

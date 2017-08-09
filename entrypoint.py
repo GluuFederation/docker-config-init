@@ -184,6 +184,11 @@ def generate_config(admin_pw, email, domain, org_name):
     cfg["replication_dn"] = "cn={},o=gluu".format(cfg["replication_cn"])
     cfg["encoded_replication_pw"] = cfg["encoded_ldap_pw"]
     cfg["encoded_ox_replication_pw"] = cfg["encoded_ox_ldap_pw"]
+    # cfg["openldapKeyPass"] = get_random_chars()
+    # cfg["openldapJksPass"] = get_random_chars()
+    cfg["encoded_openldapJksPass"] = encrypt_text(
+        get_random_chars(), cfg["encoded_salt"],
+    )
 
     # ====
     # Inum
@@ -308,27 +313,10 @@ def generate_config(admin_pw, email, domain, org_name):
         if key["alg"] == cfg["passport_rp_client_cert_alg"]:
             cfg["passport_rp_client_cert_alias"] = key["kid"]
 
-    # =======
-    # oxTrust
-    # =======
-    # cfg["oxTrustConfigGeneration"] = "false"
-    # cfg["oxtrust_config_base64"] = encode_template("oxtrust-config.json", cfg)
-
-    # cfg["oxtrust_cache_refresh_base64"] = encode_template(
-    #     "oxtrust-cache-refresh.json", cfg)
-
-    # cfg["oxtrust_import_person_base64"] = encode_template(
-    #     "oxtrust-import-person.json", cfg)
-
     # =====
     # oxIDP
     # =====
     cfg["oxidp_config_base64"] = encode_template("oxidp-config.json", cfg)
-
-    # =====
-    # oxCAS
-    # =====
-    cfg["oxcas_config_base64"] = encode_template("oxcas-config.json", cfg)
 
     # ========
     # oxAsimba
@@ -351,6 +339,12 @@ def generate_config(admin_pw, email, domain, org_name):
 
     with open(ssl_key) as f:
         cfg["ssl_key"] = f.read()
+
+    # ================
+    # Extension config
+    # ================
+    ext_cfg = get_extension_config()
+    cfg.update(ext_cfg)
 
     # populated config
     return cfg
@@ -381,6 +375,20 @@ def generate_ssl_certkey(admin_pw, email, domain, org_name):
 
     # return the paths
     return "/etc/certs/gluu_https.crt", "/etc/certs/gluu_https.key"
+
+
+def get_extension_config(basedir="/opt/config-init/static/extension"):
+    cfg = {}
+    for ext_type in os.listdir(basedir):
+        ext_type_dir = os.path.join(basedir, ext_type)
+
+        for fname in os.listdir(ext_type_dir):
+            filepath = os.path.join(ext_type_dir, fname)
+            ext_name = "{}_{}".format(ext_type, os.path.splitext(fname)[0].lower())
+
+            with open(filepath) as fd:
+                cfg[ext_name] = generate_base64_contents(fd.read())
+    return cfg
 
 
 @click.command()
