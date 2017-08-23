@@ -7,6 +7,7 @@ import random
 import shlex
 import string
 import subprocess
+import time
 import uuid
 
 import click
@@ -225,6 +226,11 @@ def generate_config(admin_pw, email, domain, org_name):
         cfg,
     )
 
+    # oxAuth keys
+    cfg["oxauth_key_rotated_at"] = int(time.time())
+    with open(cfg["oxauth_openid_jks_fn"]) as fr:
+        cfg["oxauth_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
+
     # =======
     # SCIM RS
     # =======
@@ -423,7 +429,8 @@ def main(admin_pw, email, domain, org_name, kv_host, kv_port, save, view):
     if save:
         consul = consulate.Consul(host=kv_host, port=kv_port)
         for k, v in cfg.iteritems():
-            consul.kv.set(k, v)
+            if k not in consul.kv:
+                consul.kv.set(k, v)
 
     if view:
         pprint.pprint(cfg)
