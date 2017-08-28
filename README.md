@@ -2,6 +2,10 @@
 
 A docker image to generate config required by other docker images used in Gluu Server cluster setup.
 
+## Latest Stable Release
+
+Latest stable release is `gluufederation/config-init:3.0.1_rev1.0.0-beta4`. See `CHANGES.md` for archives.
+
 ## Versioning/Tagging
 
 This image uses its own versioning/tagging format.
