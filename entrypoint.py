@@ -145,9 +145,12 @@ def encode_keys_template(jks_pass, jks_fn, jwks_fn, cfg):
     return encode_template(fn, cfg, base_dir=base_dir), pubkey
 
 
-def generate_config(admin_pw, email, domain, org_name):
+def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
+                    encoded_ox_ldap_pw="", inum_appliance=""):
     cfg = {}
-    cfg["encoded_salt"] = get_random_chars(24)
+
+    # use external encoded_salt if defined; fallback to auto-generated value
+    cfg["encoded_salt"] = encoded_salt or get_random_chars(24)
     cfg["orgName"] = org_name
     cfg["hostname"] = domain
     cfg["admin_email"] = email
@@ -179,7 +182,9 @@ def generate_config(admin_pw, email, domain, org_name):
     cfg["ldaps_port"] = 1636
     cfg["ldap_site_binddn"] = "cn=directory manager,o=site"
     cfg["encoded_ldap_pw"] = ldap_encode(admin_pw)
-    cfg["encoded_ox_ldap_pw"] = encrypt_text(admin_pw, cfg["encoded_salt"])
+
+    # use external encoded_ox_ldap_pw if defined; fallback to auto-generate value
+    cfg["encoded_ox_ldap_pw"] = encoded_ox_ldap_pw or encrypt_text(admin_pw, cfg["encoded_salt"])
     cfg["ldap_use_ssl"] = False
     cfg["replication_cn"] = "replicator"
     cfg["replication_dn"] = "cn={},o=gluu".format(cfg["replication_cn"])
@@ -193,7 +198,8 @@ def generate_config(admin_pw, email, domain, org_name):
     cfg["inumOrg"] = "{}!0001!{}".format(cfg["baseInum"], join_quad_str(2))
     cfg["inumOrgFN"] = safe_inum_str(cfg["inumOrg"])
 
-    cfg["inumAppliance"] = "{}!0002!{}".format(
+    # use external inumAppliance if defined; fallback to auto-generate value
+    cfg["inumAppliance"] = inum_appliance or "{}!0002!{}".format(
         cfg["baseInum"], join_quad_str(2))
 
     cfg["inumApplianceFN"] = safe_inum_str(cfg["inumAppliance"])
@@ -422,9 +428,23 @@ def generate_ssl_certkey(admin_pw, email, domain, org_name):
               default=False,
               help="Show generated config.",
               is_flag=True)
-def main(admin_pw, email, domain, org_name, kv_host, kv_port, save, view):
+@click.option("--encoded-salt",
+              default="",
+              help="Encoded salt.",
+              show_default=True)
+@click.option("--encoded-ox-ldap-pw",
+              default="",
+              help="Encoded ox LDAP password",
+              show_default=True)
+@click.option("--inum-appliance",
+              default="",
+              help="Inum Appliance.",
+              show_default=True)
+def main(admin_pw, email, domain, org_name, kv_host, kv_port, save, view,
+         encoded_salt, encoded_ox_ldap_pw, inum_appliance):
     # generate all config
-    cfg = generate_config(admin_pw, email, domain, org_name)
+    cfg = generate_config(admin_pw, email, domain, org_name, encoded_salt,
+                          encoded_ox_ldap_pw, inum_appliance)
 
     if save:
         consul = consulate.Consul(host=kv_host, port=kv_port)
