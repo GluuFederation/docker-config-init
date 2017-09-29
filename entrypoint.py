@@ -146,7 +146,7 @@ def encode_keys_template(jks_pass, jks_fn, jwks_fn, cfg):
 
 
 def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
-                    encoded_ox_ldap_pw="", inum_appliance=""):
+                    encoded_ox_ldap_pw="", inum_appliance="", oxauth_jks_pw=""):
     cfg = {}
 
     # use external encoded_salt if defined; fallback to auto-generated value
@@ -214,7 +214,8 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
         get_random_chars(), cfg["encoded_salt"])
 
     cfg["oxauth_openid_jks_fn"] = "/etc/certs/oxauth-keys.jks"
-    cfg["oxauth_openid_jks_pass"] = get_random_chars()
+    # use external oxauth_openid_jks_pass if defined; fallback to auto-generate value
+    cfg["oxauth_openid_jks_pass"] = oxauth_jks_pw or get_random_chars()
     cfg["oxauth_openid_jwks_fn"] = "/etc/certs/oxauth-keys.json"
 
     cfg["oxauth_config_base64"] = encode_template(
@@ -225,12 +226,14 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
 
     cfg["oxauth_error_base64"] = encode_template("oxauth-errors.json", cfg)
 
-    cfg["oxauth_openid_key_base64"], _ = encode_keys_template(
-        cfg["oxauth_openid_jks_pass"],
-        cfg["oxauth_openid_jks_fn"],
-        cfg["oxauth_openid_jwks_fn"],
-        cfg,
-    )
+    # if oxauth-keys.jks is not exist, generate them
+    if not os.path.exists(cfg["oxauth_openid_jks_fn"]):
+        cfg["oxauth_openid_key_base64"], _ = encode_keys_template(
+            cfg["oxauth_openid_jks_pass"],
+            cfg["oxauth_openid_jks_fn"],
+            cfg["oxauth_openid_jwks_fn"],
+            cfg,
+        )
 
     # oxAuth keys
     cfg["oxauth_key_rotated_at"] = int(time.time())
@@ -434,17 +437,21 @@ def generate_ssl_certkey(admin_pw, email, domain, org_name):
               show_default=True)
 @click.option("--encoded-ox-ldap-pw",
               default="",
-              help="Encoded ox LDAP password",
+              help="Encoded ox LDAP password.",
               show_default=True)
 @click.option("--inum-appliance",
               default="",
               help="Inum Appliance.",
               show_default=True)
+@click.option("--oxauth-jks-pw",
+              default="",
+              help="oxAuth OpenID JKS password.",
+              show_default=True)
 def main(admin_pw, email, domain, org_name, kv_host, kv_port, save, view,
-         encoded_salt, encoded_ox_ldap_pw, inum_appliance):
+         encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw):
     # generate all config
     cfg = generate_config(admin_pw, email, domain, org_name, encoded_salt,
-                          encoded_ox_ldap_pw, inum_appliance)
+                          encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw)
 
     if save:
         consul = consulate.Consul(host=kv_host, port=kv_port)
