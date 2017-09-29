@@ -123,7 +123,11 @@ docker run --rm \
         --view
     ```
 
-2.  How to use existing OpenLDAP (i.e. migrating from CE version of Gluu Server)?
+2.  How to use existing OpenLDAP (fresh installation)?
+
+    Run the command similar to #1 above.
+
+3.  How to use existing OpenLDAP (migrating from CE)?
 
     Here's an example to re-use existing OpenLDAP from CE:
 
