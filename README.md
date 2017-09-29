@@ -57,6 +57,7 @@ Options:
   --encoded-salt TEXT       Encoded salt.  [default: ]
   --encoded-ox-ldap-pw TEXT Encoded ox LDAP password. [default: ]
   --inum-appliance TEXT     Inum Appliance.  [default: ]
+  --oxauth-jks-pw TEXT      oxAuth OpenID JKS password.  [default: ]
   --help                    Show this message and exit.
 ```
 
@@ -122,14 +123,19 @@ docker run --rm \
         --view
     ```
 
-2.  How to use existing OpenLDAP (i.e. migrating from CE version of Gluu Server)?
+2.  How to use existing OpenLDAP (fresh installation)?
 
-    Here's an example to re-use existing OpenLDAP:
+    Run the command similar to #1 above.
+
+3.  How to use existing OpenLDAP (migrating from CE)?
+
+    Here's an example to re-use existing OpenLDAP from CE:
 
     ```
     docker run --rm \
         -v /path/to/ssl.crt:/etc/certs/gluu_https.crt \
         -v /path/to/ssl.key:/etc/certs/gluu_https.key \
+        -v /path/to/oxauth-keys.jks:/etc/certs/oxauth-keys.jks \
         gluufederation/config-init \
         --admin-pw my-password \
         --email 'my-email@my.domain.com' \
@@ -140,6 +146,7 @@ docker run --rm \
         --encoded-salt 'pCP8XcmlpaQB4JINpEGi1qyg' \
         --encoded-ox-ldap-pw 'eR3ptEcAgF1=' \
         --inum-appliance '@!F203.2552.5945.B479!0002!9G5B.E07C' \
+        --oxauth-jks-pw 'qwertyuiopasd' \
         --save \
         --view
     ```

@@ -2,6 +2,12 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.0.1_rev1.0.0-beta6
+
+Released on September 29th, 2017.
+
+* Added feature to use existing `oxauth-keys.jks` file (for migrating external LDAP/CE version).
+
 ## Version 3.0.1_rev1.0.0-beta5
 
 Released on September 19th, 2017.
