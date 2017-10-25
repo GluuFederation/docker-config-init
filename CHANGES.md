@@ -2,6 +2,12 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.1.1_rev1.0.0-beta3
+
+Released on October 25th, 2017.
+
+* Fixed work_phone dynamic script.
+
 ## Version 3.1.1_rev1.0.0-beta2
 
 Released on October 11th, 2017.
