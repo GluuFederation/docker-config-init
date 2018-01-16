@@ -285,6 +285,9 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
         cfg,
     )
 
+    with open(cfg["scim_rp_client_jks_fn"]) as fr:
+        cfg["scim_rp_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
+
     # ===========
     # Passport RS
     # ===========
