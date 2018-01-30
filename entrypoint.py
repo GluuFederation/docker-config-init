@@ -353,7 +353,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
 
     # generate self-signed SSL cert and key only if they aren't exist
     if not(os.path.exists(ssl_cert) and os.path.exists(ssl_key)):
-        generate_ssl_certkey(admin_pw, email, domain, org_name)
+        generate_ssl_certkey("gluu_https", admin_pw, email, domain, org_name)
 
     with open(ssl_cert) as f:
         cfg["ssl_cert"] = f.read()
@@ -367,35 +367,50 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     ext_cfg = get_extension_config()
     cfg.update(ext_cfg)
 
+    # ===========================
+    # IDP3 Signing and encryption
+    # ===========================
+    idp3_signing_cert = "/etc/certs/idp-signing.crt"
+    # idp3_signing_key = "/etc/certs/idp-signing.key"
+    generate_ssl_certkey("idp-signing", admin_pw, email, domain, org_name)
+    with open(idp3_signing_cert) as f:
+        cfg["idp3SigningCertificateText"] = f.read()
+
+    idp3_encryption_cert = "/etc/certs/idp-encryption.crt"
+    # idp3_encryption_key = "/etc/certs/idp-encryption.key"
+    generate_ssl_certkey("idp-encryption", admin_pw, email, domain, org_name)
+    with open(idp3_encryption_cert) as f:
+        cfg["idp3EncryptionCertificateText"] = f.read()
+
     # populated config
     return cfg
 
 
-def generate_ssl_certkey(admin_pw, email, domain, org_name):
+def generate_ssl_certkey(suffix, admin_pw, email, domain, org_name):
     # create key with password
     _, _, retcode = exec_cmd(
-        "openssl genrsa -des3 -out /etc/certs/gluu_https.key.orig "
-        "-passout pass:'{}' 2048".format(admin_pw))
+        "openssl genrsa -des3 -out /etc/certs/{}.key.orig "
+        "-passout pass:'{}' 2048".format(suffix, admin_pw))
     assert retcode == 0, "Failed to generate SSL key with password"
 
     # create .key
-    _, _, retcode = exec_cmd("openssl rsa -in /etc/certs/gluu_https.key.orig "
-                             "-passin pass:'{}' -out /etc/certs/gluu_https.key".format(admin_pw))
+    _, _, retcode = exec_cmd("openssl rsa -in /etc/certs/{0}.key.orig "
+                             "-passin pass:'{1}' -out /etc/certs/{0}.key".format(suffix, admin_pw))
     assert retcode == 0, "Failed to generate SSL key"
 
     # create .csr
-    _, _, retcode = exec_cmd("openssl req -new -key /etc/certs/gluu_https.key "
-                             "-out /etc/certs/gluu_https.csr "
-                             "-subj /O='{}'/CN='{}'/emailAddress='{}'".format(org_name, domain, email))
+    _, _, retcode = exec_cmd("openssl req -new -key /etc/certs/{0}.key "
+                             "-out /etc/certs/{0}.csr "
+                             "-subj /O='{1}'/CN='{2}'/emailAddress='{3}'".format(suffix, org_name, domain, email))
     assert retcode == 0, "Failed to generate SSL CSR"
 
     # create .crt
-    _, _, retcode = exec_cmd("openssl x509 -req -days 365 -in /etc/certs/gluu_https.csr "
-                             "-signkey /etc/certs/gluu_https.key -out /etc/certs/gluu_https.crt")
+    _, _, retcode = exec_cmd("openssl x509 -req -days 365 -in /etc/certs/{0}.csr "
+                             "-signkey /etc/certs/{0}.key -out /etc/certs/{0}.crt".format(suffix))
     assert retcode == 0, "Failed to generate SSL cert"
 
     # return the paths
-    return "/etc/certs/gluu_https.crt", "/etc/certs/gluu_https.key"
+    return "/etc/certs/{}.crt".format(suffix), "/etc/certs/{}.key".format(suffix)
 
 
 def get_extension_config(basedir="/opt/config-init/static/extension"):
