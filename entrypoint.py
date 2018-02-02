@@ -146,7 +146,8 @@ def encode_keys_template(jks_pass, jks_fn, jwks_fn, cfg):
 
 
 def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
-                    encoded_ox_ldap_pw="", inum_appliance="", oxauth_jks_pw=""):
+                    encoded_ox_ldap_pw="", inum_appliance="", oxauth_jks_pw="",
+                    ldap_type="opendj"):
     cfg = {}
 
     # use external encoded_salt if defined; fallback to auto-generated value
@@ -178,9 +179,20 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     cfg["ldap_init_host"] = ""  # need to be populated from somewhere else
     cfg["ldap_init_port"] = ""  # need to be populated from somewhere else
     cfg["ldap_port"] = 1389
-    cfg["ldap_binddn"] = "cn=directory manager,o=gluu"  # for OpenLDAP
     cfg["ldaps_port"] = 1636
-    cfg["ldap_site_binddn"] = "cn=directory manager,o=site"
+
+    cfg["ldap_binddn"] = "cn=directory manager"  # for OpenDJ
+    cfg["ldap_site_binddn"] = "cn=directory manager"
+    cfg["ldapTrustStoreFn"] = "/etc/certs/opendj.pkcs12"
+    cfg["encoded_ldapTrustStorePass"] = encrypt_text(
+        get_random_chars(), cfg["encoded_salt"],
+    )
+
+    if ldap_type == "openldap":
+        cfg["ldap_binddn"] += ",o=gluu"  # for OpenLDAP
+        cfg["ldap_site_binddn"] += ",o=site"  # for OpenLDAP
+        cfg["ldapTrustStoreFn"] = "/etc/certs/openldap.pkcs12"
+
     cfg["encoded_ldap_pw"] = ldap_encode(admin_pw)
 
     # use external encoded_ox_ldap_pw if defined; fallback to auto-generate value
@@ -190,11 +202,6 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     cfg["replication_dn"] = "cn={},o=gluu".format(cfg["replication_cn"])
     cfg["encoded_replication_pw"] = cfg["encoded_ldap_pw"]
     cfg["encoded_ox_replication_pw"] = cfg["encoded_ox_ldap_pw"]
-    # cfg["openldapKeyPass"] = get_random_chars()
-    # cfg["openldapJksPass"] = get_random_chars()
-    cfg["encoded_openldapJksPass"] = encrypt_text(
-        get_random_chars(), cfg["encoded_salt"],
-    )
 
     # ====
     # Inum
@@ -476,11 +483,18 @@ def get_extension_config(basedir="/opt/config-init/static/extension"):
               default="",
               help="oxAuth OpenID JKS password.",
               show_default=True)
+@click.option("--ldap-type",
+              default="opendj",
+              type=click.Choice(["openldap", "opendj"]),
+              help="LDAP type (opendj or openldap).",
+              show_default=True)
 def main(admin_pw, email, domain, org_name, kv_host, kv_port, save, view,
-         encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw):
+         encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw,
+         ldap_type):
     # generate all config
     cfg = generate_config(admin_pw, email, domain, org_name, encoded_salt,
-                          encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw)
+                          encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw,
+                          ldap_type)
 
     if save:
         consul = consulate.Consul(host=kv_host, port=kv_port)
