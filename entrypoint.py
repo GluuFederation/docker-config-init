@@ -4,6 +4,7 @@ import pprint
 import json
 import os
 import random
+import re
 import shlex
 import string
 import subprocess
@@ -76,6 +77,13 @@ def reindent(text, num_spaces=1):
     return text
 
 
+def safe_render(text, ctx):
+    text = re.sub(r"%([^\(])", r"%%\1", text)
+    # There was a % at the end?
+    text = re.sub(r"%$", r"%%", text)
+    return text % ctx
+
+
 def generate_base64_contents(text, num_spaces=1):
     text = text.encode("base64").strip()
     if num_spaces > 0:
@@ -100,7 +108,7 @@ def safe_inum_str(x):
 def encode_template(fn, ctx, base_dir="/opt/config-init/templates"):
     path = os.path.join(base_dir, fn)
     with open(path) as f:
-        return generate_base64_contents(f.read() % ctx)
+        return generate_base64_contents(safe_render(f.read(), ctx))
 
 
 def exec_cmd(cmd):
@@ -125,7 +133,7 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365,
     cmd = " ".join([
         "java",
         "-jar", "/opt/config-init/javalibs/keygen.jar",
-        "-algorithms", alg,
+        "-enc_keys", alg,
         "-dnname", "{!r}".format(dn),
         "-expiration", "{}".format(exp),
         "-keystore", jks_path,
