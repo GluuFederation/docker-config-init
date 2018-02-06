@@ -191,15 +191,14 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
 
     cfg["ldap_binddn"] = "cn=directory manager"  # for OpenDJ
     cfg["ldap_site_binddn"] = "cn=directory manager"
+    cfg["opendj_p12_pass"] = get_random_chars()
     cfg["ldapTrustStoreFn"] = "/etc/certs/opendj.pkcs12"
-    cfg["encoded_ldapTrustStorePass"] = encrypt_text(
-        get_random_chars(), cfg["encoded_salt"],
-    )
+    cfg["encoded_ldapTrustStorePass"] = encrypt_text(cfg["opendj_p12_pass"], cfg["encoded_salt"])
 
-    if ldap_type == "openldap":
-        cfg["ldap_binddn"] += ",o=gluu"  # for OpenLDAP
-        cfg["ldap_site_binddn"] += ",o=site"  # for OpenLDAP
-        cfg["ldapTrustStoreFn"] = "/etc/certs/openldap.pkcs12"
+    # if ldap_type == "openldap":
+    #     cfg["ldap_binddn"] += ",o=gluu"  # for OpenLDAP
+    #     cfg["ldap_site_binddn"] += ",o=site"  # for OpenLDAP
+    #     cfg["ldapTrustStoreFn"] = "/etc/certs/openldap.pkcs12"
 
     cfg["encoded_ldap_pw"] = ldap_encode(admin_pw)
 
@@ -491,18 +490,11 @@ def get_extension_config(basedir="/opt/config-init/static/extension"):
               default="",
               help="oxAuth OpenID JKS password.",
               show_default=True)
-@click.option("--ldap-type",
-              default="opendj",
-              type=click.Choice(["openldap", "opendj"]),
-              help="LDAP type (opendj or openldap).",
-              show_default=True)
 def main(admin_pw, email, domain, org_name, kv_host, kv_port, save, view,
-         encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw,
-         ldap_type):
+         encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw):
     # generate all config
     cfg = generate_config(admin_pw, email, domain, org_name, encoded_salt,
-                          encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw,
-                          ldap_type)
+                          encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw)
 
     if save:
         consul = consulate.Consul(host=kv_host, port=kv_port)
