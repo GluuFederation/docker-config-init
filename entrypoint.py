@@ -154,14 +154,17 @@ def encode_keys_template(jks_pass, jks_fn, jwks_fn, cfg):
     return encode_template(fn, cfg, base_dir=base_dir), pubkey
 
 
-def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
-                    encoded_ox_ldap_pw="", inum_appliance="", oxauth_jks_pw="",
-                    ldap_type="opendj"):
+def generate_config(admin_pw, email, domain, org_name, country_code, state, city,
+                    encoded_salt="", encoded_ox_ldap_pw="", inum_appliance="",
+                    oxauth_jks_pw="", ldap_type="opendj"):
     cfg = {}
 
     # use external encoded_salt if defined; fallback to auto-generated value
     cfg["encoded_salt"] = encoded_salt or get_random_chars(24)
     cfg["orgName"] = org_name
+    cfg["country_code"] = country_code
+    cfg["state"] = state
+    cfg["city"] = city
     cfg["hostname"] = domain
     cfg["admin_email"] = email
     cfg["default_openid_jks_dn_name"] = "CN=oxAuth CA Certificates"
@@ -368,7 +371,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
 
     # generate self-signed SSL cert and key only if they aren't exist
     if not(os.path.exists(ssl_cert) and os.path.exists(ssl_key)):
-        generate_ssl_certkey("gluu_https", admin_pw, email, domain, org_name)
+        generate_ssl_certkey("gluu_https", admin_pw, email, domain, org_name, country_code, state, city)
 
     with open(ssl_cert) as f:
         cfg["ssl_cert"] = f.read()
@@ -387,13 +390,13 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     # ===========================
     idp3_signing_cert = "/etc/certs/idp-signing.crt"
     # idp3_signing_key = "/etc/certs/idp-signing.key"
-    generate_ssl_certkey("idp-signing", admin_pw, email, domain, org_name)
+    generate_ssl_certkey("idp-signing", admin_pw, email, domain, org_name, country_code, state, city)
     with open(idp3_signing_cert) as f:
         cfg["idp3SigningCertificateText"] = f.read()
 
     idp3_encryption_cert = "/etc/certs/idp-encryption.crt"
     # idp3_encryption_key = "/etc/certs/idp-encryption.key"
-    generate_ssl_certkey("idp-encryption", admin_pw, email, domain, org_name)
+    generate_ssl_certkey("idp-encryption", admin_pw, email, domain, org_name, country_code, state, city)
     with open(idp3_encryption_cert) as f:
         cfg["idp3EncryptionCertificateText"] = f.read()
 
@@ -401,28 +404,32 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     return cfg
 
 
-def generate_ssl_certkey(suffix, admin_pw, email, domain, org_name):
+def generate_ssl_certkey(suffix, admin_pw, email, domain, org_name,
+                         country_code, state, city):
     # create key with password
-    _, _, retcode = exec_cmd(
+    _, err, retcode = exec_cmd(
         "openssl genrsa -des3 -out /etc/certs/{}.key.orig "
         "-passout pass:'{}' 2048".format(suffix, admin_pw))
-    assert retcode == 0, "Failed to generate SSL key with password"
+    assert retcode == 0, "Failed to generate SSL key with password; reason={}".format(err)
 
     # create .key
-    _, _, retcode = exec_cmd("openssl rsa -in /etc/certs/{0}.key.orig "
-                             "-passin pass:'{1}' -out /etc/certs/{0}.key".format(suffix, admin_pw))
-    assert retcode == 0, "Failed to generate SSL key"
+    _, err, retcode = exec_cmd(
+        "openssl rsa -in /etc/certs/{0}.key.orig "
+        "-passin pass:'{1}' -out /etc/certs/{0}.key".format(suffix, admin_pw))
+    assert retcode == 0, "Failed to generate SSL key; reason={}".format(err)
 
     # create .csr
-    _, _, retcode = exec_cmd("openssl req -new -key /etc/certs/{0}.key "
-                             "-out /etc/certs/{0}.csr "
-                             "-subj /O='{1}'/CN='{2}'/emailAddress='{3}'".format(suffix, org_name, domain, email))
-    assert retcode == 0, "Failed to generate SSL CSR"
+    _, err, retcode = exec_cmd(
+        "openssl req -new -key /etc/certs/{0}.key "
+        "-out /etc/certs/{0}.csr "
+        "-subj /C='{1}'/ST='{2}'/L='{3}'/O='{4}'/CN='{5}'/emailAddress='{6}'".format(suffix, country_code, state, city, org_name, domain, email))
+    assert retcode == 0, "Failed to generate SSL CSR; reason={}".format(err)
 
     # create .crt
-    _, _, retcode = exec_cmd("openssl x509 -req -days 365 -in /etc/certs/{0}.csr "
-                             "-signkey /etc/certs/{0}.key -out /etc/certs/{0}.crt".format(suffix))
-    assert retcode == 0, "Failed to generate SSL cert"
+    _, err, retcode = exec_cmd(
+        "openssl x509 -req -days 365 -in /etc/certs/{0}.csr "
+        "-signkey /etc/certs/{0}.key -out /etc/certs/{0}.crt".format(suffix))
+    assert retcode == 0, "Failed to generate SSL cert; reason={}".format(err)
 
     # return the paths
     return "/etc/certs/{}.crt".format(suffix), "/etc/certs/{}.key".format(suffix)
@@ -442,66 +449,45 @@ def get_extension_config(basedir="/opt/config-init/static/extension"):
     return cfg
 
 
+def validate_country_code(ctx, param, value):
+    if len(value) != 2:
+        raise click.BadParameter("Country code must be two characters")
+    return value
+
+
 @click.command()
-@click.option("--admin-pw",
-              default="admin",
-              help="Password for admin access.",
-              show_default=True)
-@click.option("--email",
-              default="support@gluu.example.com",
-              help="Email for support.",
-              show_default=True)
-@click.option("--domain",
-              default="gluu.example.com",
-              help="Domain for Gluu Server.",
-              show_default=True)
-@click.option("--org-name",
-              default="Gluu",
-              help="Organization name.",
-              show_default=True)
-@click.option("--kv-host",
-              default="localhost",
-              help="Hostname/IP address of KV store.",
-              show_default=True)
-@click.option("--kv-port",
-              default=8500,
-              help="Port of KV store.",
-              show_default=True)
-@click.option("--save",
-              default=False,
-              help="Save config to KV store.",
-              is_flag=True)
-@click.option("--view",
-              default=False,
-              help="Show generated config.",
-              is_flag=True)
-@click.option("--encoded-salt",
-              default="",
-              help="Encoded salt.",
-              show_default=True)
-@click.option("--encoded-ox-ldap-pw",
-              default="",
-              help="Encoded ox LDAP password.",
-              show_default=True)
-@click.option("--inum-appliance",
-              default="",
-              help="Inum Appliance.",
-              show_default=True)
-@click.option("--oxauth-jks-pw",
-              default="",
-              help="oxAuth OpenID JKS password.",
-              show_default=True)
-def main(admin_pw, email, domain, org_name, kv_host, kv_port, save, view,
-         encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw):
-    # generate all config
-    cfg = generate_config(admin_pw, email, domain, org_name, encoded_salt,
-                          encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw)
+@click.option("--admin-pw", required=True, help="Password for admin access.")
+@click.option("--email", required=True, help="Email for support.")
+@click.option("--domain", required=True, help="Domain for Gluu Server.")
+@click.option("--org-name", required=True, help="Organization name.")
+@click.option("--country-code", required=True, help="Country code.", callback=validate_country_code)
+@click.option("--state", required=True, help="State.")
+@click.option("--city", required=True, help="City.")
+@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
+@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
+@click.option("--save", default=False, help="Save config to KV store.", is_flag=True)
+@click.option("--view", default=False, help="Show generated config.", is_flag=True)
+@click.option("--encoded-salt", default="", help="Encoded salt.", show_default=True)
+@click.option("--encoded-ox-ldap-pw", default="", help="Encoded ox LDAP password.", show_default=True)
+@click.option("--inum-appliance", default="", help="Inum Appliance.", show_default=True)
+@click.option("--oxauth-jks-pw", default="", help="oxAuth OpenID JKS password.", show_default=True)
+def main(admin_pw, email, domain, org_name, country_code, state, city,
+         kv_host, kv_port, save, view, encoded_salt, encoded_ox_ldap_pw,
+         inum_appliance, oxauth_jks_pw):
+
+    consul = consulate.Consul(host=kv_host, port=kv_port)
 
     if save:
-        consul = consulate.Consul(host=kv_host, port=kv_port)
+        # generate all config
+        cfg = generate_config(
+            admin_pw, email, domain, org_name, country_code, state, city,
+            encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw,
+        )
         for k, v in cfg.iteritems():
             if k not in consul.kv:
                 consul.kv.set(k, v)
+    else:
+        cfg = dict(consul.kv)
 
     if view:
         pprint.pprint(cfg)
