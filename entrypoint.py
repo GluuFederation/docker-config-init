@@ -199,16 +199,16 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state, city
     cfg["ldapTrustStoreFn"] = "/etc/certs/opendj.pkcs12"
     cfg["encoded_ldapTrustStorePass"] = encrypt_text(cfg["opendj_p12_pass"], cfg["encoded_salt"])
 
-    # if ldap_type == "openldap":
-    #     cfg["ldap_binddn"] += ",o=gluu"  # for OpenLDAP
-    #     cfg["ldap_site_binddn"] += ",o=site"  # for OpenLDAP
-    #     cfg["ldapTrustStoreFn"] = "/etc/certs/openldap.pkcs12"
+    if ldap_type == "openldap":
+        cfg["ldap_binddn"] += ",o=gluu"  # for OpenLDAP
+        cfg["ldap_site_binddn"] += ",o=site"  # for OpenLDAP
+        cfg["ldapTrustStoreFn"] = "/etc/certs/openldap.pkcs12"
 
     cfg["encoded_ldap_pw"] = ldap_encode(admin_pw)
 
     # use external encoded_ox_ldap_pw if defined; fallback to auto-generate value
     cfg["encoded_ox_ldap_pw"] = encoded_ox_ldap_pw or encrypt_text(admin_pw, cfg["encoded_salt"])
-    cfg["ldap_use_ssl"] = False
+    cfg["ldap_use_ssl"] = True
     cfg["replication_cn"] = "replicator"
     cfg["replication_dn"] = "cn={},o=gluu".format(cfg["replication_cn"])
     cfg["encoded_replication_pw"] = cfg["encoded_ldap_pw"]
@@ -471,9 +471,10 @@ def validate_country_code(ctx, param, value):
 @click.option("--encoded-ox-ldap-pw", default="", help="Encoded ox LDAP password.", show_default=True)
 @click.option("--inum-appliance", default="", help="Inum Appliance.", show_default=True)
 @click.option("--oxauth-jks-pw", default="", help="oxAuth OpenID JKS password.", show_default=True)
+@click.option("--ldap-type", default="opendj", type=click.Choice(["opendj", "openldap"]), help="LDAP choice")
 def main(admin_pw, email, domain, org_name, country_code, state, city,
          kv_host, kv_port, save, view, encoded_salt, encoded_ox_ldap_pw,
-         inum_appliance, oxauth_jks_pw):
+         inum_appliance, oxauth_jks_pw, ldap_type):
 
     consul = consulate.Consul(host=kv_host, port=kv_port)
 
@@ -482,6 +483,7 @@ def main(admin_pw, email, domain, org_name, country_code, state, city,
         cfg = generate_config(
             admin_pw, email, domain, org_name, country_code, state, city,
             encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw,
+            ldap_type,
         )
         for k, v in cfg.iteritems():
             if k not in consul.kv:
