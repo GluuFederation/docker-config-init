@@ -40,29 +40,6 @@ To run this container and see available options, type the following command:
 docker run --rm gluufederation/config-init
 ```
 
-The output would be:
-
-```
-Usage: entrypoint.py [OPTIONS]
-
-Options:
-  --admin-pw TEXT           Password for admin access.  [default: admin]
-  --email TEXT              Email for support.  [default: support@gluu.example.com]
-  --domain TEXT             Domain for Gluu Server.  [default: gluu.example.com]
-  --org-name TEXT           Organization name.  [default: Gluu]
-  --kv-host TEXT            Hostname/IP address of KV store.  [default: localhost]
-  --kv-port INTEGER         Port of KV store.  [default: 8500]
-  --save                    Save config to KV store.
-  --view                    Show generated config.
-  --encoded-salt TEXT       Encoded salt.  [default: ]
-  --encoded-ox-ldap-pw TEXT Encoded ox LDAP password. [default: ]
-  --inum-appliance TEXT     Inum Appliance.  [default: ]
-  --oxauth-jks-pw TEXT      oxAuth OpenID JKS password.  [default: ]
-  --help                    Show this message and exit.
-```
-
-Note: all options have their default value.
-
 Here's an example to generate config (and save them to Consul KV):
 
 ```
@@ -74,6 +51,10 @@ docker run --rm \
     --org-name 'My Organization' \
     --kv-host consul.my.domain.com \
     --kv-port 8500 \
+    --country-code US \
+    --state TX \
+    --city Austin \
+    --ldap-type=openldap \
     --save
 ```
 
@@ -92,63 +73,9 @@ docker run --rm \
     --org-name 'My Organization' \
     --kv-host consul.my.domain.com \
     --kv-port 8500 \
+    --country-code US \
+    --state TX \
+    --city Austin \
+    --ldap-type=openldap \
     --save
 ```
-
-## FAQ
-
-1.  How to connect to remote Consul KV that bind into private IP address?
-
-    By using SSH tunneling, config-init will be able to connect to the KV.
-    For example:
-
-    ```
-    ssh -L 8500:<PRIVATE-IP-ADDR>:<CONSUL-CLIENT-PORT> <SSH-USER>@<REMOTE-SERVER>
-    ```
-
-    Afterwards, pass `--kv-port 8500` option when running the container:
-
-    ```
-    docker run --rm \
-        -v /path/to/ssl.crt:/etc/certs/gluu_https.crt \
-        -v /path/to/ssl.key:/etc/certs/gluu_https.key \
-        gluufederation/config-init \
-        --admin-pw my-password \
-        --email 'my-email@my.domain.com' \
-        --domain my.domain.com \
-        --org-name 'My Organization' \
-        --kv-host consul.my.domain.com \
-        --kv-port 8500 \
-        --save \
-        --view
-    ```
-
-2.  How to use existing OpenLDAP (fresh installation)?
-
-    Run the command similar to #1 above.
-
-3.  How to use existing OpenLDAP (migrating from CE)?
-
-    Here's an example to re-use existing OpenLDAP from CE:
-
-    ```
-    docker run --rm \
-        -v /path/to/ssl.crt:/etc/certs/gluu_https.crt \
-        -v /path/to/ssl.key:/etc/certs/gluu_https.key \
-        -v /path/to/oxauth-keys.jks:/etc/certs/oxauth-keys.jks \
-        gluufederation/config-init \
-        --admin-pw my-password \
-        --email 'my-email@my.domain.com' \
-        --domain my.domain.com \
-        --org-name 'My Organization' \
-        --kv-host consul.my.domain.com \
-        --kv-port 8500 \
-        --encoded-salt 'pCP8XcmlpaQB4JINpEGi1qyg' \
-        --encoded-ox-ldap-pw 'eR3ptEcAgF1=' \
-        --inum-appliance '@!F203.2552.5945.B479!0002!9G5B.E07C' \
-        --oxauth-jks-pw 'qwertyuiopasd' \
-        --save \
-        --view
-    ```
-
-    This will generate config for cluster and save them into Consul, but the data in existing OpenLDAP will be left intact.
