@@ -6,7 +6,6 @@ LABEL maintainer="Gluu Inc. <support@gluu.org>"
 # Alpine packages
 # ===============
 RUN apk update && apk add --no-cache \
-    bash \
     py-pip \
     openssl \
     openssl-dev \

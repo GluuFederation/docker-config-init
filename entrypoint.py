@@ -235,7 +235,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state, city
             cfg["ldap_ssl_key"] = encrypt_text(ldap_ssl_key, cfg["encoded_salt"])
             cfg["ldap_ssl_cacert"] = encrypt_text(ldap_ssl_cacert, cfg["encoded_salt"])
 
-        generate_pkcs12("openldap", "/etc/certs/openldap.jks", cfg["ldap_truststore_pass"], cfg["hostname"])
+        generate_pkcs12("openldap", cfg["ldap_truststore_pass"], cfg["hostname"])
         with open("/etc/certs/openldap.pkcs12") as fr:
             cfg["ldap_pkcs12_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
