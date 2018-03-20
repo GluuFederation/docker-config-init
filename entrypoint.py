@@ -209,37 +209,41 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state, city
     cfg["ldap_port"] = 1389
     cfg["ldaps_port"] = 1636
 
-    cfg["ldap_truststore_pass"] = get_random_chars()
+    ldap_truststore_pass = get_random_chars()
+    cfg["ldap_truststore_pass"] = ldap_truststore_pass
     cfg["ldap_type"] = ldap_type
 
     if cfg["ldap_type"] == "opendj":
         cfg["ldap_binddn"] = "cn=directory manager"
         cfg["ldap_site_binddn"] = "cn=directory manager"
-        # cfg["opendj_p12_pass"] = truststore_pass = get_random_chars()
         cfg["ldapTrustStoreFn"] = "/etc/certs/opendj.pkcs12"
     else:
         cfg["ldap_binddn"] = "cn=directory manager,o=gluu"
         cfg["ldap_site_binddn"] = "cn=directory manager,o=site"
         cfg["ldapTrustStoreFn"] = "/etc/certs/openldap.pkcs12"
-        # cfg["openldapKeyPass"] = truststore_pass = get_random_chars()
 
-        generate_ssl_certkey("openldap", cfg["ldap_truststore_pass"], email, domain, org_name, country_code, state, city)
-        with open("/etc/certs/openldap.pem", "w") as fw:
-            with open("/etc/certs/openldap.crt") as fr:
-                ldap_ssl_cert = fr.read()
-            with open("/etc/certs/openldap.key") as fr:
-                ldap_ssl_key = fr.read()
-            ldap_ssl_cacert = "".join([ldap_ssl_cert, ldap_ssl_key])
-            fw.write(ldap_ssl_cacert)
-            cfg["ldap_ssl_cert"] = encrypt_text(ldap_ssl_cert, cfg["encoded_salt"])
-            cfg["ldap_ssl_key"] = encrypt_text(ldap_ssl_key, cfg["encoded_salt"])
-            cfg["ldap_ssl_cacert"] = encrypt_text(ldap_ssl_cacert, cfg["encoded_salt"])
+    generate_ssl_certkey(cfg["ldap_type"], ldap_truststore_pass, email, domain,
+                         org_name, country_code, state, city)
 
-        generate_pkcs12("openldap", cfg["ldap_truststore_pass"], cfg["hostname"])
-        with open("/etc/certs/openldap.pkcs12") as fr:
-            cfg["ldap_pkcs12_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
+    with open("/etc/certs/{}.pem".format(cfg["ldap_type"]), "w") as fw:
+        with open("/etc/certs/{}.crt".format(cfg["ldap_type"])) as fr:
+            ldap_ssl_cert = fr.read()
 
-    cfg["encoded_ldapTrustStorePass"] = encrypt_text(cfg["ldap_truststore_pass"], cfg["encoded_salt"])
+        with open("/etc/certs/{}.key".format(cfg["ldap_type"])) as fr:
+            ldap_ssl_key = fr.read()
+
+        ldap_ssl_cacert = "".join([ldap_ssl_cert, ldap_ssl_key])
+        fw.write(ldap_ssl_cacert)
+
+        cfg["ldap_ssl_cert"] = encrypt_text(ldap_ssl_cert, cfg["encoded_salt"])
+        cfg["ldap_ssl_key"] = encrypt_text(ldap_ssl_key, cfg["encoded_salt"])
+        cfg["ldap_ssl_cacert"] = encrypt_text(ldap_ssl_cacert, cfg["encoded_salt"])
+
+    generate_pkcs12(cfg["ldap_type"], ldap_truststore_pass, cfg["hostname"])
+    with open(cfg["ldapTrustStoreFn"]) as fr:
+        cfg["ldap_pkcs12_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
+
+    cfg["encoded_ldapTrustStorePass"] = encrypt_text(ldap_truststore_pass, cfg["encoded_salt"])
 
     cfg["encoded_ldap_pw"] = ldap_encode(admin_pw)
 
