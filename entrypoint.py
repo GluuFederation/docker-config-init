@@ -145,12 +145,12 @@ def encode_keys_template(jks_pass, jks_fn, jwks_fn, cfg):
     return encode_template(fn, cfg, base_dir=base_dir), pubkey
 
 
-def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
+def generate_config(admin_pw, email, domain, org_name, encode_salt="",
                     encoded_ox_ldap_pw="", inum_appliance="", oxauth_jks_pw=""):
     cfg = {}
 
-    # use external encoded_salt if defined; fallback to auto-generated value
-    cfg["encoded_salt"] = encoded_salt or get_random_chars(24)
+    # use external encode_salt if defined; fallback to auto-generated value
+    cfg["encode_salt"] = encode_salt or get_random_chars(24)
     cfg["orgName"] = org_name
     cfg["hostname"] = domain
     cfg["admin_email"] = email
@@ -166,7 +166,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     cfg["shibJksPass"] = get_random_chars()
 
     cfg["encoded_shib_jks_pw"] = encrypt_text(
-        cfg["shibJksPass"], cfg["encoded_salt"])
+        cfg["shibJksPass"], cfg["encode_salt"])
 
     cfg["shibboleth_version"] = "v3"
     cfg["idp3Folder"] = "/opt/shibboleth-idp"
@@ -184,7 +184,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     cfg["encoded_ldap_pw"] = ldap_encode(admin_pw)
 
     # use external encoded_ox_ldap_pw if defined; fallback to auto-generate value
-    cfg["encoded_ox_ldap_pw"] = encoded_ox_ldap_pw or encrypt_text(admin_pw, cfg["encoded_salt"])
+    cfg["encoded_ox_ldap_pw"] = encoded_ox_ldap_pw or encrypt_text(admin_pw, cfg["encode_salt"])
     cfg["ldap_use_ssl"] = False
     cfg["replication_cn"] = "replicator"
     cfg["replication_dn"] = "cn={},o=gluu".format(cfg["replication_cn"])
@@ -193,7 +193,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     # cfg["openldapKeyPass"] = get_random_chars()
     # cfg["openldapJksPass"] = get_random_chars()
     cfg["encoded_openldapJksPass"] = encrypt_text(
-        get_random_chars(), cfg["encoded_salt"],
+        get_random_chars(), cfg["encode_salt"],
     )
 
     # ====
@@ -216,7 +216,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
         cfg["inumOrg"], join_quad_str(2))
 
     cfg["oxauthClient_encoded_pw"] = encrypt_text(
-        get_random_chars(), cfg["encoded_salt"])
+        get_random_chars(), cfg["encode_salt"])
 
     cfg["oxauth_openid_jks_fn"] = "/etc/certs/oxauth-keys.jks"
     # use external oxauth_openid_jks_pass if defined; fallback to auto-generate value
@@ -243,7 +243,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     # oxAuth keys
     cfg["oxauth_key_rotated_at"] = int(time.time())
     with open(cfg["oxauth_openid_jks_fn"]) as fr:
-        cfg["oxauth_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
+        cfg["oxauth_jks_base64"] = encrypt_text(fr.read(), cfg["encode_salt"])
 
     # =======
     # SCIM RS
@@ -256,7 +256,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     cfg["scim_rs_client_jks_pass"] = get_random_chars()
 
     cfg["scim_rs_client_jks_pass_encoded"] = encrypt_text(
-        cfg["scim_rs_client_jks_pass"], cfg["encoded_salt"])
+        cfg["scim_rs_client_jks_pass"], cfg["encode_salt"])
 
     cfg["scim_rs_client_base64_jwks"], _ = encode_keys_template(
         cfg["scim_rs_client_jks_pass"],
@@ -276,7 +276,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     cfg["scim_rp_client_jks_pass"] = get_random_chars()
 
     cfg["scim_rp_client_jks_pass_encoded"] = encrypt_text(
-        cfg["scim_rp_client_jks_pass"], cfg["encoded_salt"])
+        cfg["scim_rp_client_jks_pass"], cfg["encode_salt"])
 
     cfg["scim_rp_client_base64_jwks"], _ = encode_keys_template(
         cfg["scim_rp_client_jks_pass"],
@@ -296,7 +296,7 @@ def generate_config(admin_pw, email, domain, org_name, encoded_salt="",
     cfg["passport_rs_client_jks_pass"] = get_random_chars()
 
     cfg["passport_rs_client_jks_pass_encoded"] = encrypt_text(
-        cfg["passport_rs_client_jks_pass"], cfg["encoded_salt"])
+        cfg["passport_rs_client_jks_pass"], cfg["encode_salt"])
 
     cfg["passport_rs_client_base64_jwks"], _ = encode_keys_template(
         cfg["passport_rs_client_jks_pass"],
@@ -456,9 +456,9 @@ def get_extension_config(basedir="/opt/config-init/static/extension"):
               help="oxAuth OpenID JKS password.",
               show_default=True)
 def main(admin_pw, email, domain, org_name, kv_host, kv_port, save, view,
-         encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw):
+         encode_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw):
     # generate all config
-    cfg = generate_config(admin_pw, email, domain, org_name, encoded_salt,
+    cfg = generate_config(admin_pw, email, domain, org_name, encode_salt,
                           encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw)
 
     if save:
