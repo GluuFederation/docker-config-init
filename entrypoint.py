@@ -49,11 +49,12 @@ def get_quad():
 def encrypt_text(text, key):
     # Porting from pyDes-based encryption (see http://git.io/htxa)
     # to use M2Crypto instead (see https://gist.github.com/mrluanma/917014)
+
     cipher = Cipher(alg="des_ede_ecb",
-                    key=key,
+                    key=b"{}".format(key),
                     op=1,
                     iv="\0" * 16)
-    encrypted_text = cipher.update(text)
+    encrypted_text = cipher.update(b"{}".format(text))
     encrypted_text += cipher.final()
     return base64.b64encode(encrypted_text)
 
@@ -62,10 +63,10 @@ def decrypt_text(encrypted_text, key):
     # Porting from pyDes-based encryption (see http://git.io/htpk)
     # to use M2Crypto instead (see https://gist.github.com/mrluanma/917014)
     cipher = Cipher(alg="des_ede_ecb",
-                    key=key,
+                    key=b"{}".format(key),
                     op=0,
                     iv="\0" * 16)
-    encrypted_text = base64.b64decode(encrypted_text)
+    encrypted_text = base64.b64decode(b"{}".format(encrypted_text))
     decrypted_text = cipher.update(encrypted_text)
     decrypted_text += cipher.final()
     return decrypted_text
@@ -174,7 +175,6 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
                     city, ldap_type="opendj"):
     cfg = {}
 
-    # use external encoded_salt if defined; fallback to auto-generated value
     cfg["encoded_salt"] = get_random_chars(24)
     cfg["orgName"] = org_name
     cfg["country_code"] = country_code
@@ -239,7 +239,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
         cfg["ldap_ssl_cacert"] = encrypt_text(ldap_ssl_cacert, cfg["encoded_salt"])
 
     generate_pkcs12(cfg["ldap_type"], ldap_truststore_pass, cfg["hostname"])
-    with open(cfg["ldapTrustStoreFn"]) as fr:
+    with open(cfg["ldapTrustStoreFn"], "rb") as fr:
         cfg["ldap_pkcs12_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
     cfg["encoded_ldapTrustStorePass"] = encrypt_text(ldap_truststore_pass, cfg["encoded_salt"])
@@ -277,7 +277,6 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
         get_random_chars(), cfg["encoded_salt"])
 
     cfg["oxauth_openid_jks_fn"] = "/etc/certs/oxauth-keys.jks"
-    # use external oxauth_openid_jks_pass if defined; fallback to auto-generate value
     cfg["oxauth_openid_jks_pass"] = get_random_chars()
     cfg["oxauth_openid_jwks_fn"] = "/etc/certs/oxauth-keys.json"
 
@@ -289,14 +288,12 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
 
     cfg["oxauth_error_base64"] = encode_template("oxauth-errors.json", cfg)
 
-    # if oxauth-keys.jks is not exist, generate them
-    if not os.path.exists(cfg["oxauth_openid_jks_fn"]):
-        cfg["oxauth_openid_key_base64"], _ = encode_keys_template(
-            cfg["oxauth_openid_jks_pass"],
-            cfg["oxauth_openid_jks_fn"],
-            cfg["oxauth_openid_jwks_fn"],
-            cfg,
-        )
+    cfg["oxauth_openid_key_base64"], _ = encode_keys_template(
+        cfg["oxauth_openid_jks_pass"],
+        cfg["oxauth_openid_jks_fn"],
+        cfg["oxauth_openid_jwks_fn"],
+        cfg,
+    )
 
     # oxAuth keys
     cfg["oxauth_key_rotated_at"] = int(time.time())
@@ -562,6 +559,7 @@ def dump(kv_host, kv_port, path):
     """Dumps configuration from KV and save them into JSON file.
     """
     consul = consulate.Consul(host=kv_host, port=kv_port)
+
     cfg = {
         unmerge_path(k): v for k, v in dict(consul.kv).iteritems()
     }
