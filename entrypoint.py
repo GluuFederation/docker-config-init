@@ -14,6 +14,8 @@ import click
 import consulate
 from M2Crypto.EVP import Cipher
 
+CONFIG_PREFIX = "gluu/config/"
+
 
 # Default charset
 _DEFAULT_CHARS = "".join([string.ascii_uppercase,
@@ -493,6 +495,16 @@ def validate_country_code(ctx, param, value):
     return value
 
 
+def merge_path(name):
+    # example: `hostname` renamed to `gluu/config/hostname`
+    return "".join([CONFIG_PREFIX, name])
+
+
+def unmerge_path(name):
+    # example: `gluu/config/hostname` renamed to `hostname`
+    return name[len(CONFIG_PREFIX):]
+
+
 @click.group()
 @click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
 @click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
@@ -522,7 +534,7 @@ def generate(kv_host, kv_port, admin_pw, email, domain, org_name, country_code,
 
     for k, v in cfg.iteritems():
         click.echo("Saving {!r} config.".format(k))
-        consul.kv.set(k, v)
+        consul.kv.set(merge_path(k), v)
 
 
 @cli.command()
@@ -539,7 +551,7 @@ def load(kv_host, kv_port, path):
 
     for k, v in cfg.iteritems():
         click.echo("Saving {!r} config.".format(k))
-        consul.kv.set(k, v)
+        consul.kv.set(merge_path(k), v)
 
 
 @cli.command()
@@ -550,7 +562,10 @@ def dump(kv_host, kv_port, path):
     """Dumps configuration from KV and save them into JSON file.
     """
     consul = consulate.Consul(host=kv_host, port=kv_port)
-    cfg = json.dumps(dict(consul.kv), indent=4)
+    cfg = {
+        unmerge_path(k): v for k, v in dict(consul.kv).iteritems()
+    }
+    cfg = json.dumps(cfg, indent=4)
     with open(path, "w") as f:
         f.write(cfg)
     click.echo(cfg)
