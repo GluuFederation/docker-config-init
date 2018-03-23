@@ -1,6 +1,5 @@
 import base64
 import hashlib
-import pprint
 import json
 import os
 import random
@@ -169,13 +168,12 @@ def generate_pkcs12(suffix, passwd, hostname):
     assert retcode == 0, "Failed to generate PKCS12 file; reason={}".format(err)
 
 
-def generate_config(admin_pw, email, domain, org_name, country_code, state, city,
-                    encoded_salt="", encoded_ox_ldap_pw="", inum_appliance="",
-                    oxauth_jks_pw="", ldap_type="opendj"):
+def generate_config(admin_pw, email, domain, org_name, country_code, state,
+                    city, ldap_type="opendj"):
     cfg = {}
 
     # use external encoded_salt if defined; fallback to auto-generated value
-    cfg["encoded_salt"] = encoded_salt or get_random_chars(24)
+    cfg["encoded_salt"] = get_random_chars(24)
     cfg["orgName"] = org_name
     cfg["country_code"] = country_code
     cfg["state"] = state
@@ -247,7 +245,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state, city
     cfg["encoded_ldap_pw"] = ldap_encode(admin_pw)
 
     # use external encoded_ox_ldap_pw if defined; fallback to auto-generate value
-    cfg["encoded_ox_ldap_pw"] = encoded_ox_ldap_pw or encrypt_text(admin_pw, cfg["encoded_salt"])
+    cfg["encoded_ox_ldap_pw"] = encrypt_text(admin_pw, cfg["encoded_salt"])
     cfg["ldap_use_ssl"] = True
     cfg["replication_cn"] = "replicator"
     cfg["replication_dn"] = "cn={},o=gluu".format(cfg["replication_cn"])
@@ -262,7 +260,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state, city
     cfg["inumOrgFN"] = safe_inum_str(cfg["inumOrg"])
 
     # use external inumAppliance if defined; fallback to auto-generate value
-    cfg["inumAppliance"] = inum_appliance or "{}!0002!{}".format(
+    cfg["inumAppliance"] = "{}!0002!{}".format(
         cfg["baseInum"], join_quad_str(2))
 
     cfg["inumApplianceFN"] = safe_inum_str(cfg["inumAppliance"])
@@ -278,7 +276,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state, city
 
     cfg["oxauth_openid_jks_fn"] = "/etc/certs/oxauth-keys.jks"
     # use external oxauth_openid_jks_pass if defined; fallback to auto-generate value
-    cfg["oxauth_openid_jks_pass"] = oxauth_jks_pw or get_random_chars()
+    cfg["oxauth_openid_jks_pass"] = get_random_chars()
     cfg["oxauth_openid_jwks_fn"] = "/etc/certs/oxauth-keys.json"
 
     cfg["oxauth_config_base64"] = encode_template(
@@ -495,7 +493,16 @@ def validate_country_code(ctx, param, value):
     return value
 
 
-@click.command()
+@click.group()
+@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
+@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
+def cli(kv_host, kv_port):
+    pass
+
+
+@cli.command()
+@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
+@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
 @click.option("--admin-pw", required=True, help="Password for admin access.")
 @click.option("--email", required=True, help="Email for support.")
 @click.option("--domain", required=True, help="Domain for Gluu Server.")
@@ -503,37 +510,51 @@ def validate_country_code(ctx, param, value):
 @click.option("--country-code", required=True, help="Country code.", callback=validate_country_code)
 @click.option("--state", required=True, help="State.")
 @click.option("--city", required=True, help="City.")
-@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
-@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
-@click.option("--save", default=False, help="Save config to KV store.", is_flag=True)
-@click.option("--view", default=False, help="Show generated config.", is_flag=True)
-@click.option("--encoded-salt", default="", help="Encoded salt.", show_default=True)
-@click.option("--encoded-ox-ldap-pw", default="", help="Encoded ox LDAP password.", show_default=True)
-@click.option("--inum-appliance", default="", help="Inum Appliance.", show_default=True)
-@click.option("--oxauth-jks-pw", default="", help="oxAuth OpenID JKS password.", show_default=True)
 @click.option("--ldap-type", default="opendj", type=click.Choice(["opendj", "openldap"]), help="LDAP choice")
-def main(admin_pw, email, domain, org_name, country_code, state, city,
-         kv_host, kv_port, save, view, encoded_salt, encoded_ox_ldap_pw,
-         inum_appliance, oxauth_jks_pw, ldap_type):
-
+def generate(kv_host, kv_port, admin_pw, email, domain, org_name, country_code,
+             state, city, ldap_type):
+    """Generates initial configuration and save them into KV.
+    """
     consul = consulate.Consul(host=kv_host, port=kv_port)
 
-    if save:
-        # generate all config
-        cfg = generate_config(
-            admin_pw, email, domain, org_name, country_code, state, city,
-            encoded_salt, encoded_ox_ldap_pw, inum_appliance, oxauth_jks_pw,
-            ldap_type,
-        )
-        for k, v in cfg.iteritems():
-            if k not in consul.kv:
-                consul.kv.set(k, v)
-    else:
-        cfg = dict(consul.kv)
+    cfg = generate_config(admin_pw, email, domain, org_name, country_code,
+                          state, city, ldap_type)
 
-    if view:
-        pprint.pprint(cfg)
+    for k, v in cfg.iteritems():
+        click.echo("Saving {!r} config.".format(k))
+        consul.kv.set(k, v)
+
+
+@cli.command()
+@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
+@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
+@click.option("--path", default="/opt/config-init/db/config.json", help="Absolute path to JSON file.", show_default=True)
+def load(kv_host, kv_port, path):
+    """Loads configuration from JSON file and save them into KV.
+    """
+    consul = consulate.Consul(host=kv_host, port=kv_port)
+
+    with open(path, "r") as f:
+        cfg = json.loads(f.read())
+
+    for k, v in cfg.iteritems():
+        click.echo("Saving {!r} config.".format(k))
+        consul.kv.set(k, v)
+
+
+@cli.command()
+@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
+@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
+@click.option("--path", default="/opt/config-init/db/config.json", help="Absolute path to JSON file.", show_default=True)
+def dump(kv_host, kv_port, path):
+    """Dumps configuration from KV and save them into JSON file.
+    """
+    consul = consulate.Consul(host=kv_host, port=kv_port)
+    cfg = json.dumps(dict(consul.kv), indent=4)
+    with open(path, "w") as f:
+        f.write(cfg)
+    click.echo(cfg)
 
 
 if __name__ == "__main__":
-    main()
+    cli()

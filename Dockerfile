@@ -36,7 +36,7 @@ COPY entrypoint.py ./
 COPY templates ./templates
 COPY static ./static
 
-RUN mkdir -p /etc/certs
+RUN mkdir -p /etc/certs /opt/config-init/db
 
 ENTRYPOINT ["python", "./entrypoint.py"]
 CMD ["--help"]
