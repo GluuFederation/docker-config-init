@@ -48,11 +48,11 @@ def get_quad():
 def encrypt_text(text, key):
     # Porting from pyDes-based encryption (see http://git.io/htxa)
     # to use M2Crypto instead (see https://gist.github.com/mrluanma/917014)
-    cipher = Cipher(alg="des_ede3_ecb",
-                    key=b"{}".format(key),
+    cipher = Cipher(alg="des_ede_ecb",
+                    key=key,
                     op=1,
                     iv="\0" * 16)
-    encrypted_text = cipher.update(b"{}".format(text))
+    encrypted_text = cipher.update(text)
     encrypted_text += cipher.final()
     return base64.b64encode(encrypted_text)
 
@@ -60,13 +60,12 @@ def encrypt_text(text, key):
 def decrypt_text(encrypted_text, key):
     # Porting from pyDes-based encryption (see http://git.io/htpk)
     # to use M2Crypto instead (see https://gist.github.com/mrluanma/917014)
-    cipher = Cipher(alg="des_ede3_ecb",
-                    key=b"{}".format(key),
+    cipher = Cipher(alg="des_ede_ecb",
+                    key=key,
                     op=0,
                     iv="\0" * 16)
-    decrypted_text = cipher.update(base64.b64decode(
-        b"{}".format(encrypted_text)
-    ))
+    encrypted_text = base64.b64decode(encrypted_text)
+    decrypted_text = cipher.update(encrypted_text)
     decrypted_text += cipher.final()
     return decrypted_text
 
