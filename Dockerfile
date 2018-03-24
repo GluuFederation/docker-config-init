@@ -7,12 +7,7 @@ LABEL maintainer="Gluu Inc. <support@gluu.org>"
 # ===============
 RUN apk update && apk add --no-cache \
     py-pip \
-    openssl \
-    openssl-dev \
-    gcc \
-    musl-dev \
-    python-dev \
-    swig
+    openssl
 
 # JAR files required to generate OpenID Connect keys
 ENV OX_VERSION 3.1.2.Final

@@ -12,7 +12,7 @@ import uuid
 
 import click
 import consulate
-from M2Crypto.EVP import Cipher
+import pyDes
 
 CONFIG_PREFIX = "gluu/config/"
 
@@ -47,29 +47,10 @@ def get_quad():
 
 
 def encrypt_text(text, key):
-    # Porting from pyDes-based encryption (see http://git.io/htxa)
-    # to use M2Crypto instead (see https://gist.github.com/mrluanma/917014)
-
-    cipher = Cipher(alg="des_ede_ecb",
-                    key=b"{}".format(key),
-                    op=1,
-                    iv="\0" * 16)
-    encrypted_text = cipher.update(b"{}".format(text))
-    encrypted_text += cipher.final()
+    cipher = pyDes.triple_des(b"{}".format(key), pyDes.ECB,
+                              padmode=pyDes.PAD_PKCS5)
+    encrypted_text = cipher.encrypt(b"{}".format(text))
     return base64.b64encode(encrypted_text)
-
-
-def decrypt_text(encrypted_text, key):
-    # Porting from pyDes-based encryption (see http://git.io/htpk)
-    # to use M2Crypto instead (see https://gist.github.com/mrluanma/917014)
-    cipher = Cipher(alg="des_ede_ecb",
-                    key=b"{}".format(key),
-                    op=0,
-                    iv="\0" * 16)
-    encrypted_text = base64.b64decode(b"{}".format(encrypted_text))
-    decrypted_text = cipher.update(encrypted_text)
-    decrypted_text += cipher.final()
-    return decrypted_text
 
 
 def reindent(text, num_spaces=1):
@@ -297,7 +278,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
 
     # oxAuth keys
     cfg["oxauth_key_rotated_at"] = int(time.time())
-    with open(cfg["oxauth_openid_jks_fn"]) as fr:
+    with open(cfg["oxauth_openid_jks_fn"], "rb") as fr:
         cfg["oxauth_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
     # =======
@@ -320,7 +301,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
         cfg,
     )
 
-    with open(cfg["scim_rs_client_jks_fn"]) as fr:
+    with open(cfg["scim_rs_client_jks_fn"], "rb") as fr:
         cfg["scim_rs_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
     # =======
@@ -343,7 +324,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
         cfg,
     )
 
-    with open(cfg["scim_rp_client_jks_fn"]) as fr:
+    with open(cfg["scim_rp_client_jks_fn"], "rb") as fr:
         cfg["scim_rp_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
     # ===========
