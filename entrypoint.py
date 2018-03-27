@@ -347,6 +347,9 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
         cfg,
     )
 
+    with open(cfg["passport_rs_client_jks_fn"], "rb") as fr:
+        cfg["passport_rs_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
+
     # ===========
     # Passport RP
     # ===========
@@ -369,6 +372,9 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     for key in json.loads(pubkey)["keys"]:
         if key["alg"] == cfg["passport_rp_client_cert_alg"]:
             cfg["passport_rp_client_cert_alias"] = key["kid"]
+
+    with open(cfg["passport_rp_client_jks_fn"], "rb") as fr:
+        cfg["passport_rp_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
     # =====
     # oxIDP
