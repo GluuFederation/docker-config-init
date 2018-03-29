@@ -376,6 +376,18 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     with open(cfg["passport_rp_client_jks_fn"], "rb") as fr:
         cfg["passport_rp_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
+    exec_cmd(" ".join([
+        "keytool",
+        "-exportcert",
+        "-keystore {}".format(cfg["passport_rp_client_jks_fn"]),
+        "-storepass {}".format(cfg["passport_rp_client_jks_pass"]),
+        "-alias {}".format(cfg["passport_rp_client_cert_alias"]),
+        "-file {}".format(cfg["passport_rp_client_cert_fn"]),
+        "-rfc",
+    ]))
+    with open(cfg["passport_rp_client_cert_fn"]) as fr:
+        cfg["passport_rp_client_cert_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
+
     # =====
     # oxIDP
     # =====
