@@ -129,6 +129,19 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365,
     return out
 
 
+def export_openid_keys(keystore, keypasswd, alias, export_file):
+    cmd = " ".join([
+        "java",
+        "-cp /opt/config-init/javalibs/keygen.jar",
+        "org.xdi.oxauth.util.KeyExporter",
+        "-keystore {}".format(keystore),
+        "-keypasswd '{}'".format(keypasswd),
+        "-alias '{}'".format(alias),
+        "-exportfile {}".format(export_file),
+    ])
+    return exec_cmd(cmd)
+
+
 def encode_keys_template(jks_pass, jks_fn, jwks_fn, cfg):
     pubkey = generate_openid_keys(
         jks_pass, jks_fn, jwks_fn, cfg["default_openid_jks_dn_name"])
@@ -376,15 +389,11 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     with open(cfg["passport_rp_client_jks_fn"], "rb") as fr:
         cfg["passport_rp_jks_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
-    exec_cmd(" ".join([
-        "keytool",
-        "-exportcert",
-        "-keystore {}".format(cfg["passport_rp_client_jks_fn"]),
-        "-storepass {}".format(cfg["passport_rp_client_jks_pass"]),
-        "-alias {}".format(cfg["passport_rp_client_cert_alias"]),
-        "-file {}".format(cfg["passport_rp_client_cert_fn"]),
-        "-rfc",
-    ]))
+    export_openid_keys(cfg["passport_rp_client_jks_fn"],
+                       cfg["passport_rp_client_jks_pass"],
+                       cfg["passport_rp_client_cert_alias"],
+                       cfg["passport_rp_client_cert_fn"])
+
     with open(cfg["passport_rp_client_cert_fn"]) as fr:
         cfg["passport_rp_client_cert_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
