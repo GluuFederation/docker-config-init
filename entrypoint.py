@@ -568,9 +568,10 @@ def dump(kv_host, kv_port, path):
     """
     consul = consulate.Consul(host=kv_host, port=kv_port)
 
-    cfg = {
-        unmerge_path(k): v for k, v in dict(consul.kv).iteritems()
-    }
+    cfg = {"_config": {}}
+    for key, val in consul.kv.find("gluu/config/").iteritems():
+        cfg["_config"][unmerge_path(key)] = val
+
     cfg = json.dumps(cfg, indent=4)
     with open(path, "w") as f:
         f.write(cfg)
