@@ -554,8 +554,12 @@ def load(kv_host, kv_port, path):
     with open(path, "r") as f:
         cfg = json.loads(f.read())
 
-    for k, v in cfg.iteritems():
-        click.echo("Saving {!r} config.".format(k))
+    if "_config" not in cfg:
+        click.echo("Missing '_config' key")
+        return
+
+    for k, v in cfg.get("_config", {}).iteritems():
+        click.echo("Saving '{}' config.".format(k))
         consul.kv.set(merge_path(k), v)
 
 
