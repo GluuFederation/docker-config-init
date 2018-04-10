@@ -184,14 +184,6 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     cfg["pairwiseCalculationSalt"] = get_sys_random_chars(
         random.randint(20, 30))
 
-    cfg["shibJksFn"] = "/etc/certs/shibIDP.jks"
-    cfg["shibJksPass"] = get_random_chars()
-
-    cfg["encoded_shib_jks_pw"] = encrypt_text(
-        cfg["shibJksPass"], cfg["encoded_salt"])
-
-    cfg["shibboleth_version"] = "v3"
-    cfg["idp3Folder"] = "/opt/shibboleth-idp"
     cfg["jetty_base"] = "/opt/gluu/jetty"
 
     # ====
@@ -397,11 +389,6 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     with open(cfg["passport_rp_client_cert_fn"]) as fr:
         cfg["passport_rp_client_cert_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
-    # =====
-    # oxIDP
-    # =====
-    cfg["oxidp_config_base64"] = encode_template("oxidp-config.json", cfg)
-
     # ========
     # oxAsimba
     # ========
@@ -430,20 +417,46 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     ext_cfg = get_extension_config()
     cfg.update(ext_cfg)
 
-    # ===========================
-    # IDP3 Signing and encryption
-    # ===========================
+    # ===================
+    # IDP3 (oxShibboleth)
+    # ===================
+    cfg["oxidp_config_base64"] = encode_template("oxidp-config.json", cfg)
+
+    cfg["shibJksFn"] = "/etc/certs/shibIDP.jks"
+    cfg["shibJksPass"] = get_random_chars()
+
+    cfg["encoded_shib_jks_pw"] = encrypt_text(
+        cfg["shibJksPass"], cfg["encoded_salt"])
+
+    generate_ssl_certkey("shibIDP", admin_pw, email, domain, org_name, country_code, state, city)
+    generate_keystore("shibIDP", cfg["hostname"], cfg["shibJksPass"])
+
+    with open("/etc/certs/shibIDP.crt") as f:
+        cfg["shibIDP_cert"] = encrypt_text(f.read(), cfg["encoded_salt"])
+
+    with open(cfg["shibJksFn"]) as f:
+        cfg["shibIDP_jks_base64"] = encrypt_text(f.read(), cfg["encoded_salt"])
+
+    cfg["shibboleth_version"] = "v3"
+    cfg["idp3Folder"] = "/opt/shibboleth-idp"
+
     idp3_signing_cert = "/etc/certs/idp-signing.crt"
-    # idp3_signing_key = "/etc/certs/idp-signing.key"
+    idp3_signing_key = "/etc/certs/idp-signing.key"
     generate_ssl_certkey("idp-signing", admin_pw, email, domain, org_name, country_code, state, city)
+
     with open(idp3_signing_cert) as f:
         cfg["idp3SigningCertificateText"] = f.read()
+    with open(idp3_signing_key) as f:
+        cfg["idp3SigningKeyText"] = f.read()
 
     idp3_encryption_cert = "/etc/certs/idp-encryption.crt"
-    # idp3_encryption_key = "/etc/certs/idp-encryption.key"
+    idp3_encryption_key = "/etc/certs/idp-encryption.key"
     generate_ssl_certkey("idp-encryption", admin_pw, email, domain, org_name, country_code, state, city)
+
     with open(idp3_encryption_cert) as f:
         cfg["idp3EncryptionCertificateText"] = f.read()
+    with open(idp3_encryption_key) as f:
+        cfg["idp3EncryptionKeyText"] = f.read()
 
     # populated config
     return cfg
@@ -508,6 +521,38 @@ def merge_path(name):
 def unmerge_path(name):
     # example: `gluu/config/hostname` renamed to `hostname`
     return name[len(CONFIG_PREFIX):]
+
+
+def generate_keystore(suffix, domain, keypasswd):
+    # converts key to pkcs12
+    cmd = " ".join([
+        "openssl",
+        "pkcs12",
+        "-export",
+        "-inkey /etc/certs/{}.key".format(suffix),
+        "-in /etc/certs/{}.crt".format(suffix),
+        "-out /etc/certs/{}.pkcs12".format(suffix),
+        "-name {}".format(domain),
+        "-passout pass:'{}'".format(keypasswd),
+    ])
+    _, err, retcode = exec_cmd(cmd)
+    assert retcode == 0, "Failed to generate PKCS12 keystore; reason={}".format(err)
+
+    # imports p12 to keystore
+    cmd = " ".join([
+        "keytool",
+        "-importkeystore",
+        "-srckeystore /etc/certs/{}.pkcs12".format(suffix),
+        "-srcstorepass {}".format(keypasswd),
+        "-srcstoretype PKCS12",
+        "-destkeystore /etc/certs/{}.jks".format(suffix),
+        "-deststorepass {}".format(keypasswd),
+        "-deststoretype JKS",
+        "-keyalg RSA",
+        "-noprompt",
+    ])
+    _, err, retcode = exec_cmd(cmd)
+    assert retcode == 0, "Failed to generate JKS keystore; reason={}".format(err)
 
 
 @click.group()
