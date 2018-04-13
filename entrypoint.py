@@ -389,6 +389,23 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     with open(cfg["passport_rp_client_cert_fn"]) as fr:
         cfg["passport_rp_client_cert_base64"] = encrypt_text(fr.read(), cfg["encoded_salt"])
 
+    # ===========
+    # Passport SP
+    # ===========
+
+    cfg["passportSpKeyPass"] = get_random_chars()
+    cfg["passportSpTLSCACert"] = '/etc/certs/passport-sp.pem'
+    cfg["passportSpTLSCert"] = '/etc/certs/passport-sp.crt'
+    cfg["passportSpTLSKey"] = '/etc/certs/passport-sp.key'
+    cfg["passportSpJksPass"] = get_random_chars()
+    cfg["passportSpJksFn"] = '/etc/certs/passport-sp.jks'
+
+    generate_ssl_certkey("passport-sp", cfg["passportSpKeyPass"], email, domain, org_name, country_code, state, city)
+    with open(cfg["passportSpTLSCert"]) as f:
+        cfg["passport_sp_cert_base64"] = encrypt_text(f.read(), cfg["encoded_salt"])
+    with open(cfg["passportSpTLSKey"]) as f:
+        cfg["passport_sp_key_base64"] = encrypt_text(f.read(), cfg["encoded_salt"])
+
     # ========
     # oxAsimba
     # ========
@@ -428,11 +445,14 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     cfg["encoded_shib_jks_pw"] = encrypt_text(
         cfg["shibJksPass"], cfg["encoded_salt"])
 
-    generate_ssl_certkey("shibIDP", admin_pw, email, domain, org_name, country_code, state, city)
+    generate_ssl_certkey("shibIDP", cfg["shibJksPass"], email, domain, org_name, country_code, state, city)
     generate_keystore("shibIDP", cfg["hostname"], cfg["shibJksPass"])
 
     with open("/etc/certs/shibIDP.crt") as f:
         cfg["shibIDP_cert"] = encrypt_text(f.read(), cfg["encoded_salt"])
+
+    with open("/etc/certs/shibIDP.key") as f:
+        cfg["shibIDP_key"] = encrypt_text(f.read(), cfg["encoded_salt"])
 
     with open(cfg["shibJksFn"]) as f:
         cfg["shibIDP_jks_base64"] = encrypt_text(f.read(), cfg["encoded_salt"])
@@ -442,7 +462,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
 
     idp3_signing_cert = "/etc/certs/idp-signing.crt"
     idp3_signing_key = "/etc/certs/idp-signing.key"
-    generate_ssl_certkey("idp-signing", admin_pw, email, domain, org_name, country_code, state, city)
+    generate_ssl_certkey("idp-signing", cfg["shibJksPass"], email, domain, org_name, country_code, state, city)
 
     with open(idp3_signing_cert) as f:
         cfg["idp3SigningCertificateText"] = f.read()
@@ -451,7 +471,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
 
     idp3_encryption_cert = "/etc/certs/idp-encryption.crt"
     idp3_encryption_key = "/etc/certs/idp-encryption.key"
-    generate_ssl_certkey("idp-encryption", admin_pw, email, domain, org_name, country_code, state, city)
+    generate_ssl_certkey("idp-encryption", cfg["shibJksPass"], email, domain, org_name, country_code, state, city)
 
     with open(idp3_encryption_cert) as f:
         cfg["idp3EncryptionCertificateText"] = f.read()
@@ -462,18 +482,18 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     return cfg
 
 
-def generate_ssl_certkey(suffix, admin_pw, email, domain, org_name,
+def generate_ssl_certkey(suffix, passwd, email, domain, org_name,
                          country_code, state, city):
     # create key with password
     _, err, retcode = exec_cmd(
         "openssl genrsa -des3 -out /etc/certs/{}.key.orig "
-        "-passout pass:'{}' 2048".format(suffix, admin_pw))
+        "-passout pass:'{}' 2048".format(suffix, passwd))
     assert retcode == 0, "Failed to generate SSL key with password; reason={}".format(err)
 
     # create .key
     _, err, retcode = exec_cmd(
         "openssl rsa -in /etc/certs/{0}.key.orig "
-        "-passin pass:'{1}' -out /etc/certs/{0}.key".format(suffix, admin_pw))
+        "-passin pass:'{1}' -out /etc/certs/{0}.key".format(suffix, passwd))
     assert retcode == 0, "Failed to generate SSL key; reason={}".format(err)
 
     # create .csr
