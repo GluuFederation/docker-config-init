@@ -1,18 +1,18 @@
 # Config Init
 
-A docker image to generate config required by other docker images used in Gluu Server cluster setup.
+A docker image to generate the necessary configuration required by other docker Gluu Server images.
 
 ## Versioning/Tagging
 
 This image uses its own versioning/tagging format.
 
-    <IMAGE-NAME>:<GLUU-SERVER-VERSION>_<INTERNAL-REV-VERSION>
+    <IMAGE-NAME>:<GLUU-SERVER-VERSION>_<DEV_BUILD>
 
-For example, `gluufederation/config-init:3.1.2_r1` consists of:
+For example, `gluufederation/config-init:3.1.2_dev` consists of:
 
 - glufederation/config-init as `<IMAGE_NAME>`; the actual image name
-- 3.2.2 as `GLUU-SERVER-VERSION`; the Gluu Server version as setup reference
-- r1 `<INTERNAL-REV-VERSION>`; revision made when developing the image
+- 3.1.2 as `GLUU-SERVER-VERSION`; the Gluu Server version as setup reference
+- \_dev as `<BASELINE_DEV>`; used until official production release
 
 ## Installation
 
@@ -44,7 +44,7 @@ docker run --rm \
     --country-code US \
     --state TX \
     --city Austin \
-    --ldap-type=openldap
+    --ldap-type=opendj
 ```
 
 The config and self-signed SSL cert and key will be generated.
