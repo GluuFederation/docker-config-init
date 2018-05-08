@@ -9,11 +9,17 @@ RUN apk update && apk add --no-cache \
     py-pip \
     openssl
 
+# ====
+# Java
+# ====
+
 # JAR files required to generate OpenID Connect keys
 ENV OX_VERSION 3.1.3.Final
 ENV OX_BUILD_DATE 2018-04-30
-RUN mkdir -p /opt/config-init/javalibs \
-    && wget -q http://ox.gluu.org/maven/org/xdi/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/keygen.jar
+RUN mkdir -p /opt/config-init/javalibs
+RUN wget -q http://ox.gluu.org/maven/org/xdi/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/oxauth-client.jar
+RUN wget -q http://ox.gluu.org/maven/org/xdi/oxShibbolethKeyGenerator/${OX_VERSION}/oxShibbolethKeyGenerator-${OX_VERSION}.jar -O /opt/config-init/javalibs/idp3_cml_keygenerator.jar
+
 
 # ======
 # Python

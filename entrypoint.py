@@ -114,7 +114,7 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365,
 
     cmd = " ".join([
         "java",
-        "-jar", "/opt/config-init/javalibs/keygen.jar",
+        "-jar", "/opt/config-init/javalibs/oxauth-client.jar",
         "-enc_keys", alg,
         "-sig_keys", alg,
         "-dnname", "{!r}".format(dn),
@@ -132,7 +132,7 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365,
 def export_openid_keys(keystore, keypasswd, alias, export_file):
     cmd = " ".join([
         "java",
-        "-cp /opt/config-init/javalibs/keygen.jar",
+        "-cp /opt/config-init/javalibs/oxauth-client.jar",
         "org.xdi.oxauth.util.KeyExporter",
         "-keystore {}".format(keystore),
         "-keypasswd '{}'".format(keypasswd),
@@ -478,6 +478,10 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     with open(idp3_encryption_key) as f:
         cfg["idp3EncryptionKeyText"] = f.read()
 
+    gen_idp3_key(cfg["shibJksPass"])
+    with open("/etc/certs/sealer.jks") as f:
+        cfg["sealer_jks_base64"] = encrypt_text(f.read(), cfg["encoded_salt"])
+
     # populated config
     return cfg
 
@@ -573,6 +577,13 @@ def generate_keystore(suffix, domain, keypasswd):
     ])
     _, err, retcode = exec_cmd(cmd)
     assert retcode == 0, "Failed to generate JKS keystore; reason={}".format(err)
+
+
+def gen_idp3_key(shibJksPass):
+    out, err, retcode = exec_cmd("java -classpath /opt/config-init/javalibs/idp3_cml_keygenerator.jar "
+                                 "'org.xdi.oxshibboleth.keygenerator.KeyGenerator' "
+                                 "/etc/certs {}".format(shibJksPass))
+    return out, err, retcode
 
 
 @click.group()
