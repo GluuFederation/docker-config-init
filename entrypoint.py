@@ -582,13 +582,13 @@ def generate_keystore(suffix, domain, keypasswd):
     assert retcode == 0, "Failed to generate JKS keystore; reason={}".format(err)
 
 
-<<<<<<< HEAD
 def gen_idp3_key(shibJksPass):
     out, err, retcode = exec_cmd("java -classpath /opt/config-init/javalibs/idp3_cml_keygenerator.jar "
                                  "'org.xdi.oxshibboleth.keygenerator.KeyGenerator' "
                                  "/etc/certs {}".format(shibJksPass))
     return out, err, retcode
-=======
+
+
 def wait_for_consul(consul):
     click.echo("Checking connection to Consul.")
 
@@ -607,7 +607,6 @@ def wait_for_consul(consul):
 
     click.echo("Consul is not ready after {} seconds.".format(MAX_WAIT_SECONDS))
     sys.exit(1)
->>>>>>> 3.1.2
 
 
 @click.group()
