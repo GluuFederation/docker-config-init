@@ -113,7 +113,7 @@ class PersonAuthentication(PersonAuthenticationType):
                     mobile_number = foundUser.getAttribute("telephoneNumber")
                 if  mobile_number == None:
                     print "TwilioSMS, Error finding mobile number for user '%'" % user_name
-                    
+
             except:
                 print 'TwilioSMS, Error finding mobile number for' % (user_name)
                 return False
@@ -176,10 +176,7 @@ class PersonAuthentication(PersonAuthenticationType):
         return False
 
     def getExtraParametersForStep(self, configurationAttributes, step):
-        if step == 2:
-            return Arrays.asList("code")
-
-        return None
+        return Arrays.asList("code", "mobile_number")
 
     def getCountAuthenticationSteps(self, configurationAttributes):
         return 2
