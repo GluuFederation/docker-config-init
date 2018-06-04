@@ -481,6 +481,10 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     with open(idp3_encryption_key) as f:
         cfg["idp3EncryptionKeyText"] = f.read()
 
+    gen_idp3_key(cfg["shibJksPass"])
+    with open("/etc/certs/sealer.jks") as f:
+        cfg["sealer_jks_base64"] = encrypt_text(f.read(), cfg["encoded_salt"])
+
     # populated config
     return cfg
 
@@ -576,6 +580,13 @@ def generate_keystore(suffix, domain, keypasswd):
     ])
     _, err, retcode = exec_cmd(cmd)
     assert retcode == 0, "Failed to generate JKS keystore; reason={}".format(err)
+
+
+def gen_idp3_key(shibJksPass):
+    out, err, retcode = exec_cmd("java -classpath /opt/config-init/javalibs/idp3_cml_keygenerator.jar "
+                                 "'org.xdi.oxshibboleth.keygenerator.KeyGenerator' "
+                                 "/etc/certs {}".format(shibJksPass))
+    return out, err, retcode
 
 
 def wait_for_consul(consul):
