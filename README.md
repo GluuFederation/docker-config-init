@@ -68,6 +68,8 @@ docker run --rm \
 
 Dump configuration configuration into a JSON file.
 
+Example on how to dump into host's `$HOME/db/config.json` file:
+
 ```
 docker run --rm \
     -v $HOME/db:/opt/config-init/db \
@@ -81,9 +83,11 @@ docker run --rm \
 
 Load configuration from a JSON file.
 
+Example on how to load from host's `$HOME/db/config.json` file:
+
 ```
 docker run --rm \
-    -v $HOME/db/config.json:/opt/config-init/db/config.json \
+    -v $HOME/db:/opt/config-init/db \
     gluufederation/config-init:3.1.3_dev load \
     --kv-host consul.example.com \
     --kv-port 8500 \
