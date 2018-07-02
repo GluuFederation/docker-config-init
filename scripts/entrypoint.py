@@ -12,11 +12,10 @@ import time
 import uuid
 
 import click
-import consulate
 import pyDes
-import requests
 
-CONFIG_PREFIX = "gluu/config/"
+from gluu_config import ConfigManager
+
 MAX_WAIT_SECONDS = 300
 SLEEP_DURATION = 5
 
@@ -540,16 +539,6 @@ def validate_country_code(ctx, param, value):
     return value
 
 
-def merge_path(name):
-    # example: `hostname` renamed to `gluu/config/hostname`
-    return "".join([CONFIG_PREFIX, name])
-
-
-def unmerge_path(name):
-    # example: `gluu/config/hostname` renamed to `hostname`
-    return name[len(CONFIG_PREFIX):]
-
-
 def generate_keystore(suffix, domain, keypasswd):
     # converts key to pkcs12
     cmd = " ".join([
@@ -589,36 +578,29 @@ def gen_idp3_key(shibJksPass):
     return out, err, retcode
 
 
-def wait_for_consul(consul):
-    click.echo("Checking connection to Consul.")
-
+def wait_for_config(config_manager):
     for i in range(0, MAX_WAIT_SECONDS, SLEEP_DURATION):
         try:
-            value = consul.status.leader()
-
-            if value:
-                click.echo("Consul is ready.")
-                return
-
-        except requests.exceptions.ConnectionError:
-            click.echo("Consul is not ready, "
-                       "retrying in {} seconds.".format(SLEEP_DURATION))
+            config_manager.get("hostname")
+            click.echo("Config backend is ready.")
+            return
+        except Exception as exc:
+            click.echo(exc)
+            click.echo(
+                "Config backend is not ready, retrying in {} seconds.".format(
+                    SLEEP_DURATION))
         time.sleep(SLEEP_DURATION)
 
-    click.echo("Consul is not ready after {} seconds.".format(MAX_WAIT_SECONDS))
+    click.echo("Config backend is not ready after {} seconds.".format(MAX_WAIT_SECONDS))
     sys.exit(1)
 
 
 @click.group()
-@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
-@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
-def cli(kv_host, kv_port):
+def cli():
     pass
 
 
 @cli.command()
-@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
-@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
 @click.option("--admin-pw", required=True, help="Password for admin access.")
 @click.option("--email", required=True, help="Email for support.")
 @click.option("--domain", required=True, help="Domain for Gluu Server.")
@@ -627,31 +609,32 @@ def cli(kv_host, kv_port):
 @click.option("--state", required=True, help="State.")
 @click.option("--city", required=True, help="City.")
 @click.option("--ldap-type", default="opendj", type=click.Choice(["opendj", "openldap"]), help="LDAP choice")
-def generate(kv_host, kv_port, admin_pw, email, domain, org_name, country_code,
+def generate(admin_pw, email, domain, org_name, country_code,
              state, city, ldap_type):
     """Generates initial configuration and save them into KV.
     """
-    consul = consulate.Consul(host=kv_host, port=kv_port)
-    wait_for_consul(consul)
+    config_manager = ConfigManager()
+    wait_for_config(config_manager)
 
+    click.echo("Generating config.")
     cfg = generate_config(admin_pw, email, domain, org_name, country_code,
                           state, city, ldap_type)
 
+    click.echo("Saving config.")
     for k, v in cfg.iteritems():
-        consul.kv.set(merge_path(k), v)
-    click.echo("Config successfully saved to Consul.")
+        config_manager.set(k, v)
+    click.echo("Config successfully saved.")
 
 
 @cli.command()
-@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
-@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
 @click.option("--path", default="/opt/config-init/db/config.json", help="Absolute path to JSON file.", show_default=True)
-def load(kv_host, kv_port, path):
+def load(path):
     """Loads configuration from JSON file and save them into KV.
     """
-    consul = consulate.Consul(host=kv_host, port=kv_port)
-    wait_for_consul(consul)
+    config_manager = ConfigManager()
+    wait_for_config(config_manager)
 
+    click.echo("Loading config.")
     with open(path, "r") as f:
         cfg = json.loads(f.read())
 
@@ -659,26 +642,26 @@ def load(kv_host, kv_port, path):
         click.echo("Missing '_config' key.")
         return
 
-    for k, v in cfg.get("_config", {}).iteritems():
-        consul.kv.set(merge_path(k), v)
-    click.echo("Config successfully loaded from {}, "
-               "saved to Consul.".format(path))
+    click.echo("Saving config.")
+    for k, v in cfg["_config"].iteritems():
+        config_manager.set(k, v)
+    click.echo("Config successfully loaded from {}".format(path))
 
 
 @cli.command()
-@click.option("--kv-host", default="localhost", help="Hostname/IP address of KV store.", show_default=True)
-@click.option("--kv-port", default=8500, help="Port of KV store.", show_default=True)
 @click.option("--path", default="/opt/config-init/db/config.json", help="Absolute path to JSON file.", show_default=True)
-def dump(kv_host, kv_port, path):
+def dump(path):
     """Dumps configuration from KV and save them into JSON file.
     """
-    consul = consulate.Consul(host=kv_host, port=kv_port)
-    wait_for_consul(consul)
+    config_manager = ConfigManager()
+    wait_for_config(config_manager)
 
+    click.echo("Dumping config.")
     cfg = {"_config": {}}
-    for key, val in consul.kv.find(CONFIG_PREFIX).iteritems():
-        cfg["_config"][unmerge_path(key)] = val
+    for k, v in config_manager.all().iteritems():
+        cfg["_config"][k] = v
 
+    click.echo("Saving config.")
     cfg = json.dumps(cfg, indent=4)
     with open(path, "w") as f:
         f.write(cfg)

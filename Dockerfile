@@ -24,19 +24,19 @@ RUN wget -q http://ox.gluu.org/maven/org/xdi/oxShibbolethKeyGenerator/${OX_VERSI
 # Python
 # ======
 
-RUN pip install -U pip
 WORKDIR /opt/config-init
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -U pip \
+    && pip install --no-cache-dir -r requirements.txt
 
 # ====
 # misc
 # ====
-COPY entrypoint.py ./
+COPY scripts ./scripts
 COPY templates ./templates
 COPY static ./static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
 
-ENTRYPOINT ["python", "./entrypoint.py"]
+ENTRYPOINT ["python", "./scripts/entrypoint.py"]
 CMD ["--help"]
