@@ -111,9 +111,7 @@ class KubernetesConfig(BaseConfig):
 
     def get(self, key, default=None):
         result = self.all()
-        if key in result:
-            return key
-        return default
+        return result.get(key, default)
 
     def _prepare_configmap(self):
         # create a configmap name if not exist
