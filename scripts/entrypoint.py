@@ -581,9 +581,11 @@ def gen_idp3_key(shibJksPass):
 def wait_for_config(config_manager):
     for i in range(0, MAX_WAIT_SECONDS, SLEEP_DURATION):
         try:
-            if config_manager.get("hostname"):
-                click.echo("Config backend is ready.")
-                return
+            # we don't care about the result, we only need to test
+            # the connection
+            config_manager.get("hostname")
+            click.echo("Config backend is ready.")
+            return
         except Exception as exc:
             click.echo(exc)
             click.echo(
