@@ -2,6 +2,13 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.1.3_02
+
+Released on July 19th, 2018.
+
+* Added wrapper to manage config via Consul KV or Kubernetes configmap.
+* Added feature to dump config into JSON file when running `generate` command.
+
 ## Version 3.1.3_01
 
 Released on June 6th, 2018.
