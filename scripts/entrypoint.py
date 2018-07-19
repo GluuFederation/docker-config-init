@@ -611,8 +611,9 @@ def cli():
 @click.option("--state", required=True, help="State.")
 @click.option("--city", required=True, help="City.")
 @click.option("--ldap-type", default="opendj", type=click.Choice(["opendj", "openldap"]), help="LDAP choice")
+@click.option("--path", default="/opt/config-init/db/config.json", help="Absolute path to JSON file.", show_default=True)
 def generate(admin_pw, email, domain, org_name, country_code,
-             state, city, ldap_type):
+             state, city, ldap_type, path):
     """Generates initial configuration and save them into KV.
     """
     config_manager = ConfigManager()
@@ -625,7 +626,13 @@ def generate(admin_pw, email, domain, org_name, country_code,
     click.echo("Saving config.")
     for k, v in cfg.iteritems():
         config_manager.set(k, v)
-    click.echo("Config successfully saved.")
+    click.echo("Config saved to backend.")
+
+    cfg = {"_config": cfg}
+    cfg = json.dumps(cfg, indent=4)
+    with open(path, "w") as f:
+        f.write(cfg)
+        click.echo("Config saved to {}.".format(path))
 
 
 @cli.command()
@@ -658,12 +665,8 @@ def dump(path):
     config_manager = ConfigManager()
     wait_for_config(config_manager)
 
-    click.echo("Dumping config.")
-    cfg = {"_config": {}}
-    for k, v in config_manager.all().iteritems():
-        cfg["_config"][k] = v
-
     click.echo("Saving config.")
+    cfg = {"_config": config_manager.all()}
     cfg = json.dumps(cfg, indent=4)
     with open(path, "w") as f:
         f.write(cfg)
