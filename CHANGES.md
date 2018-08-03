@@ -2,6 +2,12 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.1.3_03
+
+Released on August 3rd, 2018.
+
+* Added optional params for baseInum, inumOrg, and inumAppliance.
+
 ## Version 3.1.3_02
 
 Released on July 19th, 2018.
