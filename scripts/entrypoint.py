@@ -168,7 +168,8 @@ def generate_pkcs12(suffix, passwd, hostname):
 
 
 def generate_config(admin_pw, email, domain, org_name, country_code, state,
-                    city, ldap_type="opendj"):
+                    city, ldap_type="opendj", base_inum="", inum_org="",
+                    inum_appliance=""):
     cfg = {}
 
     cfg["encoded_salt"] = get_random_chars(24)
@@ -245,12 +246,12 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     # ====
     # Inum
     # ====
-    cfg["baseInum"] = "@!{}".format(join_quad_str(4))
-    cfg["inumOrg"] = "{}!0001!{}".format(cfg["baseInum"], join_quad_str(2))
+    cfg["baseInum"] = base_inum or "@!{}".format(join_quad_str(4))
+    cfg["inumOrg"] = inum_org or "{}!0001!{}".format(cfg["baseInum"], join_quad_str(2))
     cfg["inumOrgFN"] = safe_inum_str(cfg["inumOrg"])
 
     # use external inumAppliance if defined; fallback to auto-generate value
-    cfg["inumAppliance"] = "{}!0002!{}".format(
+    cfg["inumAppliance"] = inum_appliance or "{}!0002!{}".format(
         cfg["baseInum"], join_quad_str(2))
 
     cfg["inumApplianceFN"] = safe_inum_str(cfg["inumAppliance"])
@@ -612,8 +613,11 @@ def cli():
 @click.option("--city", required=True, help="City.")
 @click.option("--ldap-type", default="opendj", type=click.Choice(["opendj", "openldap"]), help="LDAP choice")
 @click.option("--path", default="/opt/config-init/db/config.json", help="Absolute path to JSON file.", show_default=True)
-def generate(admin_pw, email, domain, org_name, country_code,
-             state, city, ldap_type, path):
+@click.option("--base-inum", default="", help="Base inum.", show_default=True)
+@click.option("--inum-org", default="", help="Organization inum.", show_default=True)
+@click.option("--inum-appliance", default="", help="Appliance inum.", show_default=True)
+def generate(admin_pw, email, domain, org_name, country_code, state, city,
+             ldap_type, path, base_inum, inum_org, inum_appliance):
     """Generates initial configuration and save them into KV.
     """
     config_manager = ConfigManager()
@@ -621,7 +625,8 @@ def generate(admin_pw, email, domain, org_name, country_code,
 
     click.echo("Generating config.")
     cfg = generate_config(admin_pw, email, domain, org_name, country_code,
-                          state, city, ldap_type)
+                          state, city, ldap_type, base_inum, inum_org,
+                          inum_appliance)
 
     click.echo("Saving config.")
     for k, v in cfg.iteritems():
