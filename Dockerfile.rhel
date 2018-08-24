@@ -1,13 +1,10 @@
-FROM openjdk:jre-alpine
+FROM registry.access.redhat.com/rhel7-minimal
 
 LABEL maintainer="Gluu Inc. <support@gluu.org>"
 
-# ===============
-# Alpine packages
-# ===============
-RUN apk update && apk add --no-cache \
-    py-pip \
-    openssl
+# =============
+# RHEL packages
+# =============
 
 # ====
 # Java
@@ -26,7 +23,8 @@ RUN wget -q http://ox.gluu.org/maven/org/xdi/oxShibbolethKeyGenerator/${OX_VERSI
 
 WORKDIR /opt/config-init
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -U pip \
+RUN source scl_source enable python27 \
+    && pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir -r requirements.txt
 
 # ====
