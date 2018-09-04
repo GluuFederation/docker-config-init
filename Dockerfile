@@ -38,5 +38,8 @@ COPY static ./static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
 
+# force to use default consistency mode
+ENV GLUU_CONSUL_CONSISTENCY default
+
 ENTRYPOINT ["python", "./scripts/entrypoint.py"]
 CMD ["--help"]
