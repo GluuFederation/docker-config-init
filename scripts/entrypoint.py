@@ -19,6 +19,7 @@ from gluu_config import ConfigManager
 
 MAX_WAIT_SECONDS = 300
 SLEEP_DURATION = 5
+GLUU_OVERWRITE_ALL = os.environ.get("GLUU_OVERWRITE_ALL", False)
 
 # Default charset
 _DEFAULT_CHARS = "".join([string.ascii_uppercase,
@@ -894,9 +895,14 @@ def set_config(key, value):
     # check existing value first
     _value = config_manager.get(key)
 
-    if _value:
+    overwrite_all = as_boolean(GLUU_OVERWRITE_ALL)
+
+    if overwrite_all:
+        click.echo("  updating key {!r}".format(key))
+        config_manager.set(key, value)
+    elif _value:
         # if there's value, skip saving the value
-        click.echo("  skipping existing key {!r}".format(key))
+        click.echo("  ignoring existing key {!r}".format(key))
         value = _value
     else:
         click.echo("  adding new key {!r}".format(key))
