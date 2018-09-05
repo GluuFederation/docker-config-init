@@ -2,6 +2,13 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.1.3_04
+
+Released on September 6th, 2018.
+
+* Added feature to guard existing keys being overwritten when executing `generate` and `load` commands.
+* Added environment variable to force rewrite all keys when executing `generate` and `load` commands.
+
 ## Version 3.1.3_03
 
 Released on August 3rd, 2018.
