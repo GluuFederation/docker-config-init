@@ -174,40 +174,40 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
                     inum_appliance=""):
     cfg = {}
 
-    cfg["encoded_salt"] = set_config("encoded_salt", get_random_chars(24))
-    cfg["orgName"] = set_config("orgName", org_name)
-    cfg["country_code"] = set_config("country_code", country_code)
-    cfg["state"] = set_config("state", state)
-    cfg["city"] = set_config("city", city)
-    cfg["hostname"] = set_config("hostname", domain)
-    cfg["admin_email"] = set_config("admin_email", email)
-    cfg["default_openid_jks_dn_name"] = set_config("default_openid_jks_dn_name",
+    cfg["encoded_salt"] = set_keyval("encoded_salt", get_random_chars(24))
+    cfg["orgName"] = set_keyval("orgName", org_name)
+    cfg["country_code"] = set_keyval("country_code", country_code)
+    cfg["state"] = set_keyval("state", state)
+    cfg["city"] = set_keyval("city", city)
+    cfg["hostname"] = set_keyval("hostname", domain)
+    cfg["admin_email"] = set_keyval("admin_email", email)
+    cfg["default_openid_jks_dn_name"] = set_keyval("default_openid_jks_dn_name",
                                                    "CN=oxAuth CA Certificates")
 
-    cfg["pairwiseCalculationKey"] = set_config(
+    cfg["pairwiseCalculationKey"] = set_keyval(
         "pairwiseCalculationKey",
         get_sys_random_chars(random.randint(20, 30)),
     )
 
-    cfg["pairwiseCalculationSalt"] = set_config(
+    cfg["pairwiseCalculationSalt"] = set_keyval(
         "pairwiseCalculationSalt",
         get_sys_random_chars(random.randint(20, 30)),
     )
 
-    cfg["jetty_base"] = set_config("jetty_base", "/opt/gluu/jetty")
+    cfg["jetty_base"] = set_keyval("jetty_base", "/opt/gluu/jetty")
 
     # ====
     # LDAP
     # ====
-    cfg["ldap_init_host"] = set_config("ldap_init_host", "localhost")
-    cfg["ldap_init_port"] = int(set_config("ldap_init_port", 1636))
-    cfg["ldap_port"] = int(set_config("ldap_port", 1389))
-    cfg["ldaps_port"] = int(set_config("ldaps_port", 1636))
+    cfg["ldap_init_host"] = set_keyval("ldap_init_host", "localhost")
+    cfg["ldap_init_port"] = int(set_keyval("ldap_init_port", 1636))
+    cfg["ldap_port"] = int(set_keyval("ldap_port", 1389))
+    cfg["ldaps_port"] = int(set_keyval("ldaps_port", 1636))
 
-    cfg["ldap_truststore_pass"] = set_config("ldap_truststore_pass",
+    cfg["ldap_truststore_pass"] = set_keyval("ldap_truststore_pass",
                                              get_random_chars())
 
-    cfg["ldap_type"] = set_config("ldap_type", ldap_type)
+    cfg["ldap_type"] = set_keyval("ldap_type", ldap_type)
 
     if cfg["ldap_type"] == "opendj":
         ldap_binddn = "cn=directory manager"
@@ -218,9 +218,9 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
         ldap_site_binddn = "cn=directory manager,o=site"
         ldapTrustStoreFn = "/etc/certs/openldap.pkcs12"
 
-    cfg["ldap_binddn"] = set_config("ldap_binddn", ldap_binddn)
-    cfg["ldap_site_binddn"] = set_config("ldap_site_binddn", ldap_site_binddn)
-    cfg["ldapTrustStoreFn"] = set_config("ldapTrustStoreFn", ldapTrustStoreFn)
+    cfg["ldap_binddn"] = set_keyval("ldap_binddn", ldap_binddn)
+    cfg["ldap_site_binddn"] = set_keyval("ldap_site_binddn", ldap_site_binddn)
+    cfg["ldapTrustStoreFn"] = set_keyval("ldapTrustStoreFn", ldapTrustStoreFn)
 
     generate_ssl_certkey(
         cfg["ldap_type"],
@@ -236,7 +236,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     with open("/etc/certs/{}.crt".format(cfg["ldap_type"])) as fr:
         ldap_ssl_cert = fr.read()
 
-        cfg["ldap_ssl_cert"] = set_config(
+        cfg["ldap_ssl_cert"] = set_keyval(
             "ldap_ssl_cert",
             encrypt_text(ldap_ssl_cert, cfg["encoded_salt"]),
         )
@@ -244,7 +244,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     with open("/etc/certs/{}.key".format(cfg["ldap_type"])) as fr:
         ldap_ssl_key = fr.read()
 
-        cfg["ldap_ssl_key"] = set_config(
+        cfg["ldap_ssl_key"] = set_keyval(
             "ldap_ssl_key",
             encrypt_text(ldap_ssl_key, cfg["encoded_salt"]),
         )
@@ -253,86 +253,86 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
         ldap_ssl_cacert = "".join([ldap_ssl_cert, ldap_ssl_key])
         fw.write(ldap_ssl_cacert)
 
-        cfg["ldap_ssl_cacert"] = set_config(
+        cfg["ldap_ssl_cacert"] = set_keyval(
             "ldap_ssl_cacert",
             encrypt_text(ldap_ssl_cacert, cfg["encoded_salt"]),
         )
 
     generate_pkcs12(cfg["ldap_type"], cfg["ldap_truststore_pass"], cfg["hostname"])
     with open(cfg["ldapTrustStoreFn"], "rb") as fr:
-        cfg["ldap_pkcs12_base64"] = set_config(
+        cfg["ldap_pkcs12_base64"] = set_keyval(
             "ldap_pkcs12_base64",
             encrypt_text(fr.read(), cfg["encoded_salt"]),
         )
 
-    cfg["encoded_ldapTrustStorePass"] = set_config(
+    cfg["encoded_ldapTrustStorePass"] = set_keyval(
         "encoded_ldapTrustStorePass",
         encrypt_text(cfg["ldap_truststore_pass"], cfg["encoded_salt"]),
     )
 
-    cfg["encoded_ldap_pw"] = set_config("encoded_ldap_pw", ldap_encode(admin_pw))
-    cfg["encoded_ox_ldap_pw"] = set_config(
+    cfg["encoded_ldap_pw"] = set_keyval("encoded_ldap_pw", ldap_encode(admin_pw))
+    cfg["encoded_ox_ldap_pw"] = set_keyval(
         "encoded_ox_ldap_pw", encrypt_text(admin_pw, cfg["encoded_salt"]),
     )
-    cfg["ldap_use_ssl"] = as_boolean(set_config("ldap_use_ssl", True))
-    cfg["replication_cn"] = set_config("replication_cn", "replicator")
-    cfg["replication_dn"] = set_config("replication_dn", "cn={},o=gluu".format(cfg["replication_cn"]))
-    cfg["encoded_replication_pw"] = set_config("encoded_replication_pw",
+    cfg["ldap_use_ssl"] = as_boolean(set_keyval("ldap_use_ssl", True))
+    cfg["replication_cn"] = set_keyval("replication_cn", "replicator")
+    cfg["replication_dn"] = set_keyval("replication_dn", "cn={},o=gluu".format(cfg["replication_cn"]))
+    cfg["encoded_replication_pw"] = set_keyval("encoded_replication_pw",
                                                cfg["encoded_ldap_pw"])
-    cfg["encoded_ox_replication_pw"] = set_config("encoded_ox_replication_pw",
+    cfg["encoded_ox_replication_pw"] = set_keyval("encoded_ox_replication_pw",
                                                   cfg["encoded_ox_ldap_pw"])
 
     # ====
     # Inum
     # ====
-    cfg["baseInum"] = set_config(
+    cfg["baseInum"] = set_keyval(
         "baseInum",
         base_inum or "@!{}".format(join_quad_str(4))
     )
 
-    cfg["inumOrg"] = set_config(
+    cfg["inumOrg"] = set_keyval(
         "inumOrg",
         inum_org or "{}!0001!{}".format(cfg["baseInum"], join_quad_str(2)),
     )
 
-    cfg["inumOrgFN"] = set_config("inumOrgFN", safe_inum_str(cfg["inumOrg"]))
+    cfg["inumOrgFN"] = set_keyval("inumOrgFN", safe_inum_str(cfg["inumOrg"]))
 
-    cfg["inumAppliance"] = set_config(
+    cfg["inumAppliance"] = set_keyval(
         "inumAppliance",
         inum_appliance or "{}!0002!{}".format(cfg["baseInum"], join_quad_str(2)),
     )
 
-    cfg["inumApplianceFN"] = set_config("inumApplianceFN", safe_inum_str(cfg["inumAppliance"]))
+    cfg["inumApplianceFN"] = set_keyval("inumApplianceFN", safe_inum_str(cfg["inumAppliance"]))
 
     # ======
     # oxAuth
     # ======
-    cfg["oxauth_client_id"] = set_config(
+    cfg["oxauth_client_id"] = set_keyval(
         "oxauth_client_id",
         "{}!0008!{}".format(cfg["inumOrg"], join_quad_str(2)),
     )
 
-    cfg["oxauthClient_encoded_pw"] = set_config(
+    cfg["oxauthClient_encoded_pw"] = set_keyval(
         "oxauthClient_encoded_pw",
         encrypt_text(get_random_chars(), cfg["encoded_salt"]),
     )
 
-    cfg["oxauth_openid_jks_fn"] = set_config("oxauth_openid_jks_fn", "/etc/certs/oxauth-keys.jks")
-    cfg["oxauth_openid_jks_pass"] = set_config(
+    cfg["oxauth_openid_jks_fn"] = set_keyval("oxauth_openid_jks_fn", "/etc/certs/oxauth-keys.jks")
+    cfg["oxauth_openid_jks_pass"] = set_keyval(
         "oxauth_openid_jks_pass", get_random_chars())
-    cfg["oxauth_openid_jwks_fn"] = set_config("oxauth_openid_jwks_fn", "/etc/certs/oxauth-keys.json")
+    cfg["oxauth_openid_jwks_fn"] = set_keyval("oxauth_openid_jwks_fn", "/etc/certs/oxauth-keys.json")
 
-    cfg["oxauth_config_base64"] = set_config(
+    cfg["oxauth_config_base64"] = set_keyval(
         "oxauth_config_base64",
         encode_template("oxauth-config.json", cfg),
     )
 
-    cfg["oxauth_static_conf_base64"] = set_config(
+    cfg["oxauth_static_conf_base64"] = set_keyval(
         "oxauth_static_conf_base64",
         encode_template("oxauth-static-conf.json", cfg),
     )
 
-    cfg["oxauth_error_base64"] = set_config(
+    cfg["oxauth_error_base64"] = set_keyval(
         "oxauth_error_base64",
         encode_template("oxauth-errors.json", cfg),
     )
@@ -345,19 +345,19 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     )
 
     basedir, fn = os.path.split(cfg["oxauth_openid_jwks_fn"])
-    cfg["oxauth_openid_key_base64"] = set_config(
+    cfg["oxauth_openid_key_base64"] = set_keyval(
         "oxauth_openid_key_base64",
         encode_template(fn, cfg, basedir),
     )
 
     # oxAuth keys
-    cfg["oxauth_key_rotated_at"] = int(set_config(
+    cfg["oxauth_key_rotated_at"] = int(set_keyval(
         "oxauth_key_rotated_at",
         int(time.time()),
     ))
 
     with open(cfg["oxauth_openid_jks_fn"], "rb") as fr:
-        cfg["oxauth_jks_base64"] = set_config(
+        cfg["oxauth_jks_base64"] = set_keyval(
             "oxauth_jks_base64",
             encrypt_text(fr.read(), cfg["encoded_salt"])
         )
@@ -365,19 +365,19 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     # =======
     # SCIM RS
     # =======
-    cfg["scim_rs_client_id"] = set_config(
+    cfg["scim_rs_client_id"] = set_keyval(
         "scim_rs_client_id",
         "{}!0008!{}".format(cfg["inumOrg"], join_quad_str(2)),
     )
 
-    cfg["scim_rs_client_jks_fn"] = set_config("scim_rs_client_jks_fn",
+    cfg["scim_rs_client_jks_fn"] = set_keyval("scim_rs_client_jks_fn",
                                               "/etc/certs/scim-rs.jks")
-    cfg["scim_rs_client_jwks_fn"] = set_config("scim_rs_client_jwks_fn",
+    cfg["scim_rs_client_jwks_fn"] = set_keyval("scim_rs_client_jwks_fn",
                                                "/etc/certs/scim-rs-keys.json")
-    cfg["scim_rs_client_jks_pass"] = set_config(
+    cfg["scim_rs_client_jks_pass"] = set_keyval(
         "scim_rs_client_jks_pass", get_random_chars())
 
-    cfg["scim_rs_client_jks_pass_encoded"] = set_config(
+    cfg["scim_rs_client_jks_pass_encoded"] = set_keyval(
         "scim_rs_client_jks_pass_encoded",
         encrypt_text(cfg["scim_rs_client_jks_pass"], cfg["encoded_salt"]),
     )
@@ -390,13 +390,13 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     )
 
     basedir, fn = os.path.split(cfg["scim_rs_client_jwks_fn"])
-    cfg["scim_rs_client_base64_jwks"] = set_config(
+    cfg["scim_rs_client_base64_jwks"] = set_keyval(
         "scim_rs_client_base64_jwks",
         encode_template(fn, cfg, basedir),
     )
 
     with open(cfg["scim_rs_client_jks_fn"], "rb") as fr:
-        cfg["scim_rs_jks_base64"] = set_config(
+        cfg["scim_rs_jks_base64"] = set_keyval(
             "scim_rs_jks_base64",
             encrypt_text(fr.read(), cfg["encoded_salt"]),
         )
@@ -404,16 +404,16 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     # =======
     # SCIM RP
     # =======
-    cfg["scim_rp_client_id"] = set_config(
+    cfg["scim_rp_client_id"] = set_keyval(
         "scim_rp_client_id",
         "{}!0008!{}".format(cfg["inumOrg"], join_quad_str(2)),
     )
 
-    cfg["scim_rp_client_jks_fn"] = set_config("scim_rp_client_jks_fn", "/etc/certs/scim-rp.jks")
-    cfg["scim_rp_client_jwks_fn"] = set_config("scim_rp_client_jwks_fn", "/etc/certs/scim-rp-keys.json")
-    cfg["scim_rp_client_jks_pass"] = set_config("scim_rp_client_jks_pass", get_random_chars())
+    cfg["scim_rp_client_jks_fn"] = set_keyval("scim_rp_client_jks_fn", "/etc/certs/scim-rp.jks")
+    cfg["scim_rp_client_jwks_fn"] = set_keyval("scim_rp_client_jwks_fn", "/etc/certs/scim-rp-keys.json")
+    cfg["scim_rp_client_jks_pass"] = set_keyval("scim_rp_client_jks_pass", get_random_chars())
 
-    cfg["scim_rp_client_jks_pass_encoded"] = set_config(
+    cfg["scim_rp_client_jks_pass_encoded"] = set_keyval(
         "scim_rp_client_jks_pass_encoded",
         encrypt_text(cfg["scim_rp_client_jks_pass"], cfg["encoded_salt"]),
     )
@@ -426,13 +426,13 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     )
 
     basedir, fn = os.path.split(cfg["scim_rp_client_jwks_fn"])
-    cfg["scim_rp_client_base64_jwks"] = set_config(
+    cfg["scim_rp_client_base64_jwks"] = set_keyval(
         "scim_rp_client_base64_jwks",
         encode_template(fn, cfg, basedir),
     )
 
     with open(cfg["scim_rp_client_jks_fn"], "rb") as fr:
-        cfg["scim_rp_jks_base64"] = set_config(
+        cfg["scim_rp_jks_base64"] = set_keyval(
             "scim_rp_jks_base64",
             encrypt_text(fr.read(), cfg["encoded_salt"]),
         )
@@ -440,17 +440,17 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     # ===========
     # Passport RS
     # ===========
-    cfg["passport_rs_client_id"] = set_config(
+    cfg["passport_rs_client_id"] = set_keyval(
         "passport_rs_client_id",
         "{}!0008!{}".format(cfg["inumOrg"], join_quad_str(2)),
     )
 
-    cfg["passport_rs_client_jks_fn"] = set_config("passport_rs_client_jks_fn", "/etc/certs/passport-rs.jks")
-    cfg["passport_rs_client_jwks_fn"] = set_config("passport_rs_client_jwks_fn", "/etc/certs/passport-rs-keys.json")
-    cfg["passport_rs_client_jks_pass"] = set_config(
+    cfg["passport_rs_client_jks_fn"] = set_keyval("passport_rs_client_jks_fn", "/etc/certs/passport-rs.jks")
+    cfg["passport_rs_client_jwks_fn"] = set_keyval("passport_rs_client_jwks_fn", "/etc/certs/passport-rs-keys.json")
+    cfg["passport_rs_client_jks_pass"] = set_keyval(
         "passport_rs_client_jks_pass", get_random_chars())
 
-    cfg["passport_rs_client_jks_pass_encoded"] = set_config(
+    cfg["passport_rs_client_jks_pass_encoded"] = set_keyval(
         "passport_rs_client_jks_pass_encoded",
         encrypt_text(cfg["passport_rs_client_jks_pass"], cfg["encoded_salt"]),
     )
@@ -463,13 +463,13 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     )
 
     basedir, fn = os.path.split(cfg["passport_rs_client_jwks_fn"])
-    cfg["passport_rs_client_base64_jwks"] = set_config(
+    cfg["passport_rs_client_base64_jwks"] = set_keyval(
         "passport_rs_client_base64_jwks",
         encode_template(fn, cfg, basedir),
     )
 
     with open(cfg["passport_rs_client_jks_fn"], "rb") as fr:
-        cfg["passport_rs_jks_base64"] = set_config(
+        cfg["passport_rs_jks_base64"] = set_keyval(
             "passport_rs_jks_base64",
             encrypt_text(fr.read(), cfg["encoded_salt"])
         )
@@ -477,17 +477,17 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     # ===========
     # Passport RP
     # ===========
-    cfg["passport_rp_client_id"] = set_config(
+    cfg["passport_rp_client_id"] = set_keyval(
         "passport_rp_client_id",
         "{}!0008!{}".format(cfg["inumOrg"], join_quad_str(2)),
     )
 
-    cfg["passport_rp_client_jks_pass"] = set_config(
+    cfg["passport_rp_client_jks_pass"] = set_keyval(
         "passport_rp_client_jks_pass", get_random_chars())
-    cfg["passport_rp_client_jks_fn"] = set_config("passport_rp_client_jks_fn", "/etc/certs/passport-rp.jks")
-    cfg["passport_rp_client_jwks_fn"] = set_config("passport_rp_client_jwks_fn", "/etc/certs/passport-rp-keys.json")
-    cfg["passport_rp_client_cert_fn"] = set_config("passport_rp_client_cert_fn", "/etc/certs/passport-rp.pem")
-    cfg["passport_rp_client_cert_alg"] = set_config("passport_rp_client_cert_alg", "RS512")
+    cfg["passport_rp_client_jks_fn"] = set_keyval("passport_rp_client_jks_fn", "/etc/certs/passport-rp.jks")
+    cfg["passport_rp_client_jwks_fn"] = set_keyval("passport_rp_client_jwks_fn", "/etc/certs/passport-rp-keys.json")
+    cfg["passport_rp_client_cert_fn"] = set_keyval("passport_rp_client_cert_fn", "/etc/certs/passport-rp.pem")
+    cfg["passport_rp_client_cert_alg"] = set_keyval("passport_rp_client_cert_alg", "RS512")
 
     cert_alias = gen_export_openid_keys(
         cfg["passport_rp_client_jks_pass"],
@@ -499,23 +499,23 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     )
 
     basedir, fn = os.path.split(cfg["passport_rp_client_jwks_fn"])
-    cfg["passport_rp_client_base64_jwks"] = set_config(
+    cfg["passport_rp_client_base64_jwks"] = set_keyval(
         "passport_rp_client_base64_jwks",
         encode_template(fn, cfg, basedir),
     )
 
-    cfg["passport_rp_client_cert_alias"] = set_config(
+    cfg["passport_rp_client_cert_alias"] = set_keyval(
         "passport_rp_client_cert_alias", cert_alias
     )
 
     with open(cfg["passport_rp_client_jks_fn"], "rb") as fr:
-        cfg["passport_rp_jks_base64"] = set_config(
+        cfg["passport_rp_jks_base64"] = set_keyval(
             "passport_rp_jks_base64",
             encrypt_text(fr.read(), cfg["encoded_salt"]),
         )
 
     with open(cfg["passport_rp_client_cert_fn"]) as fr:
-        cfg["passport_rp_client_cert_base64"] = set_config(
+        cfg["passport_rp_client_cert_base64"] = set_keyval(
             "passport_rp_client_cert_base64",
             encrypt_text(fr.read(), cfg["encoded_salt"]),
         )
@@ -524,12 +524,12 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     # Passport SP
     # ===========
 
-    cfg["passportSpKeyPass"] = set_config("passportSpKeyPass", get_random_chars())
-    cfg["passportSpTLSCACert"] = set_config("passportSpTLSCACert", '/etc/certs/passport-sp.pem')
-    cfg["passportSpTLSCert"] = set_config("passportSpTLSCert", '/etc/certs/passport-sp.crt')
-    cfg["passportSpTLSKey"] = set_config("passportSpTLSKey", '/etc/certs/passport-sp.key')
-    cfg["passportSpJksPass"] = set_config("passportSpJksPass", get_random_chars())
-    cfg["passportSpJksFn"] = set_config("passportSpJksFn", '/etc/certs/passport-sp.jks')
+    cfg["passportSpKeyPass"] = set_keyval("passportSpKeyPass", get_random_chars())
+    cfg["passportSpTLSCACert"] = set_keyval("passportSpTLSCACert", '/etc/certs/passport-sp.pem')
+    cfg["passportSpTLSCert"] = set_keyval("passportSpTLSCert", '/etc/certs/passport-sp.crt')
+    cfg["passportSpTLSKey"] = set_keyval("passportSpTLSKey", '/etc/certs/passport-sp.key')
+    cfg["passportSpJksPass"] = set_keyval("passportSpJksPass", get_random_chars())
+    cfg["passportSpJksFn"] = set_keyval("passportSpJksFn", '/etc/certs/passport-sp.jks')
 
     generate_ssl_certkey(
         "passport-sp",
@@ -542,12 +542,12 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
         cfg["city"],
     )
     with open(cfg["passportSpTLSCert"]) as f:
-        cfg["passport_sp_cert_base64"] = set_config(
+        cfg["passport_sp_cert_base64"] = set_keyval(
             "passport_sp_cert_base64",
             encrypt_text(f.read(), cfg["encoded_salt"])
         )
     with open(cfg["passportSpTLSKey"]) as f:
-        cfg["passport_sp_key_base64"] = set_config(
+        cfg["passport_sp_key_base64"] = set_keyval(
             "passport_sp_key_base64",
             encrypt_text(f.read(), cfg["encoded_salt"])
         )
@@ -555,7 +555,7 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     # ========
     # oxAsimba
     # ========
-    cfg["oxasimba_config_base64"] = set_config(
+    cfg["oxasimba_config_base64"] = set_keyval(
         "oxasimba_config_base64",
         encode_template("oxasimba-config.json", cfg),
     )
@@ -580,10 +580,10 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
         )
 
     with open(ssl_cert) as f:
-        cfg["ssl_cert"] = set_config("ssl_cert", f.read())
+        cfg["ssl_cert"] = set_keyval("ssl_cert", f.read())
 
     with open(ssl_key) as f:
-        cfg["ssl_key"] = set_config("ssl_key", f.read())
+        cfg["ssl_key"] = set_keyval("ssl_key", f.read())
 
     # ================
     # Extension config
@@ -594,15 +594,15 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     # ===================
     # IDP3 (oxShibboleth)
     # ===================
-    cfg["oxidp_config_base64"] = set_config(
+    cfg["oxidp_config_base64"] = set_keyval(
         "oxidp_config_base64",
         encode_template("oxidp-config.json", cfg)
     )
 
-    cfg["shibJksFn"] = set_config("shibJksFn", "/etc/certs/shibIDP.jks")
-    cfg["shibJksPass"] = set_config("shibJksPass", get_random_chars())
+    cfg["shibJksFn"] = set_keyval("shibJksFn", "/etc/certs/shibIDP.jks")
+    cfg["shibJksPass"] = set_keyval("shibJksPass", get_random_chars())
 
-    cfg["encoded_shib_jks_pw"] = set_config(
+    cfg["encoded_shib_jks_pw"] = set_keyval(
         "encoded_shib_jks_pw",
         encrypt_text(cfg["shibJksPass"], cfg["encoded_salt"])
     )
@@ -620,25 +620,25 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     generate_keystore("shibIDP", cfg["hostname"], cfg["shibJksPass"])
 
     with open("/etc/certs/shibIDP.crt") as f:
-        cfg["shibIDP_cert"] = set_config(
+        cfg["shibIDP_cert"] = set_keyval(
             "shibIDP_cert",
             encrypt_text(f.read(), cfg["encoded_salt"])
         )
 
     with open("/etc/certs/shibIDP.key") as f:
-        cfg["shibIDP_key"] = set_config(
+        cfg["shibIDP_key"] = set_keyval(
             "shibIDP_key",
             encrypt_text(f.read(), cfg["encoded_salt"])
         )
 
     with open(cfg["shibJksFn"]) as f:
-        cfg["shibIDP_jks_base64"] = set_config(
+        cfg["shibIDP_jks_base64"] = set_keyval(
             "shibIDP_jks_base64",
             encrypt_text(f.read(), cfg["encoded_salt"])
         )
 
-    cfg["shibboleth_version"] = set_config("shibboleth_version", "v3")
-    cfg["idp3Folder"] = set_config("idp3Folder", "/opt/shibboleth-idp")
+    cfg["shibboleth_version"] = set_keyval("shibboleth_version", "v3")
+    cfg["idp3Folder"] = set_keyval("idp3Folder", "/opt/shibboleth-idp")
 
     idp3_signing_cert = "/etc/certs/idp-signing.crt"
     idp3_signing_key = "/etc/certs/idp-signing.key"
@@ -654,9 +654,9 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     )
 
     with open(idp3_signing_cert) as f:
-        cfg["idp3SigningCertificateText"] = set_config("idp3SigningCertificateText", f.read())
+        cfg["idp3SigningCertificateText"] = set_keyval("idp3SigningCertificateText", f.read())
     with open(idp3_signing_key) as f:
-        cfg["idp3SigningKeyText"] = set_config("idp3SigningKeyText", f.read())
+        cfg["idp3SigningKeyText"] = set_keyval("idp3SigningKeyText", f.read())
 
     idp3_encryption_cert = "/etc/certs/idp-encryption.crt"
     idp3_encryption_key = "/etc/certs/idp-encryption.key"
@@ -672,13 +672,13 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     )
 
     with open(idp3_encryption_cert) as f:
-        cfg["idp3EncryptionCertificateText"] = set_config("idp3EncryptionCertificateText", f.read())
+        cfg["idp3EncryptionCertificateText"] = set_keyval("idp3EncryptionCertificateText", f.read())
     with open(idp3_encryption_key) as f:
-        cfg["idp3EncryptionKeyText"] = set_config("idp3EncryptionKeyText", f.read())
+        cfg["idp3EncryptionKeyText"] = set_keyval("idp3EncryptionKeyText", f.read())
 
     gen_idp3_key(cfg["shibJksPass"])
     with open("/etc/certs/sealer.jks") as f:
-        cfg["sealer_jks_base64"] = set_config(
+        cfg["sealer_jks_base64"] = set_keyval(
             "sealer_jks_base64",
             encrypt_text(f.read(), cfg["encoded_salt"])
         )
@@ -746,7 +746,7 @@ def get_extension_config(basedir="/opt/config-init/static/extension"):
             ext_name = "{}_{}".format(ext_type, os.path.splitext(fname)[0].lower())
 
             with open(filepath) as fd:
-                cfg[ext_name] = set_config(
+                cfg[ext_name] = set_keyval(
                     ext_name,
                     generate_base64_contents(fd.read())
                 )
@@ -842,10 +842,15 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city,
     wait_for_config(config_manager)
 
     click.echo("Generating config.")
+    # tolerancy before checking existing key
+    time.sleep(5)
     cfg = generate_config(admin_pw, email, domain, org_name, country_code,
                           state, city, ldap_type, base_inum, inum_org,
                           inum_appliance)
 
+    click.echo("Saving config.")
+    for k, v in cfg.iteritems():
+        config_manager.set(k, v)
     click.echo("Config saved to backend")
 
     cfg = {"_config": cfg}
@@ -871,8 +876,11 @@ def load(path):
         return
 
     click.echo("Saving config.")
+    # tolerancy before checking existing key
+    time.sleep(5)
     for k, v in cfg["_config"].iteritems():
-        set_config(k, v)
+        v = set_keyval(k, v)
+        config_manager.set(k, v)
     click.echo("Config successfully loaded from {}".format(path))
 
 
@@ -891,7 +899,7 @@ def dump(path):
         click.echo("Config saved to {}.".format(path))
 
 
-def set_config(key, value):
+def set_keyval(key, value):
     # check existing value first
     _value = config_manager.get(key)
 
@@ -901,12 +909,10 @@ def set_config(key, value):
         click.echo("  updating key {!r}".format(key))
         config_manager.set(key, value)
     elif _value:
-        # if there's value, skip saving the value
         click.echo("  ignoring existing key {!r}".format(key))
         value = _value
     else:
         click.echo("  adding new key {!r}".format(key))
-        config_manager.set(key, value)
     return value
 
 
