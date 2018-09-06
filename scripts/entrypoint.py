@@ -594,6 +594,16 @@ def generate_config(admin_pw, email, domain, org_name, country_code, state,
     # ===================
     # IDP3 (oxShibboleth)
     # ===================
+    cfg["idp_client_id"] = set_keyval(
+        "idp_client_id",
+        "{}!0008!{}".format(cfg["inumOrg"], join_quad_str(2)),
+    )
+
+    cfg["idpClient_encoded_pw"] = set_keyval(
+        "idpClient_encoded_pw",
+        encrypt_text(get_random_chars(), cfg["encoded_salt"]),
+    )
+
     cfg["oxidp_config_base64"] = set_keyval(
         "oxidp_config_base64",
         encode_template("oxidp-config.json", cfg)
