@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 import six
@@ -6,6 +7,12 @@ import kubernetes.client
 import kubernetes.config
 from consul import Consul
 
+logger = logging.getLogger("gluu_config")
+logger.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+fmt = logging.Formatter('%(levelname)s - %(asctime)s - %(message)s')
+ch.setFormatter(fmt)
+logger.addHandler(ch)
 
 # config storage adapter
 GLUU_CONFIG_ADAPTER = os.environ.get("GLUU_CONFIG_ADAPTER", "consul")
@@ -33,19 +40,19 @@ GLUU_CONSUL_VERIFY = os.environ.get("GLUU_CONSUL_VERIFY", False)
 
 # abspath to Consul CA cert file
 GLUU_CONSUL_CACERT_FILE = os.environ.get("GLUU_CONSUL_CACERT_FILE",
-                                         "/run/secrets/consul_cacert.pem")
+                                         "/etc/certs/consul_ca.crt")
 
 # abspath to Consul cert file
 GLUU_CONSUL_CERT_FILE = os.environ.get("GLUU_CONSUL_CERT_FILE",
-                                       "/run/secrets/consul_client.crt")
+                                       "/etc/certs/consul_client.crt")
 
 # abspath to Consul key file
 GLUU_CONSUL_KEY_FILE = os.environ.get("GLUU_CONSUL_KEY_FILE",
-                                      "/run/secrets/consul_client.key")
+                                      "/etc/certs/consul_client.key")
 
 # abspath to Consul token file
 GLUU_CONSUL_TOKEN_FILE = os.environ.get("GLUU_CONSUL_TOKEN_FILE",
-                                        "/run/secrets/consul_token")
+                                        "/etc/certs/consul_token")
 
 # the namespace used for storing configmap
 GLUU_KUBERNETES_NAMESPACE = os.environ.get("GLUU_KUBERNETES_NAMESPACE",
@@ -116,6 +123,8 @@ class ConsulConfig(BaseConfig):
         if os.path.isfile(GLUU_CONSUL_CACERT_FILE):
             verify = GLUU_CONSUL_CACERT_FILE
 
+        self._request_warning(GLUU_CONSUL_SCHEME, verify)
+
         self.client = Consul(
             host=GLUU_CONSUL_HOST,
             port=GLUU_CONSUL_PORT,
@@ -160,6 +169,14 @@ class ConsulConfig(BaseConfig):
 
     def all(self):
         return self.find("")
+
+    def _request_warning(self, scheme, verify):
+        if scheme == "https" and verify is False:
+            import urllib3
+            urllib3.disable_warnings()
+            logger.warn("All requests to Consul will be unverified. "
+                        "Please adjust GLUU_CONSUL_SCHEME and "
+                        "GLUU_CONSUL_VERIFY environment variables.")
 
 
 class KubernetesConfig(BaseConfig):
