@@ -6,6 +6,7 @@ import kubernetes.client
 import kubernetes.config
 from consul import Consul
 
+
 # config storage adapter
 GLUU_CONFIG_ADAPTER = os.environ.get("GLUU_CONFIG_ADAPTER", "consul")
 
@@ -26,10 +27,42 @@ GLUU_CONSUL_PORT = os.environ.get(
 # consul consistency mode
 GLUU_CONSUL_CONSISTENCY = os.environ.get("GLUU_CONSUL_CONSISTENCY", "stale")
 
+GLUU_CONSUL_SCHEME = os.environ.get("GLUU_CONSUL_SCHEME", "http")
+
+GLUU_CONSUL_VERIFY = os.environ.get("GLUU_CONSUL_VERIFY", False)
+
+# abspath to Consul CA cert file
+GLUU_CONSUL_CACERT_FILE = os.environ.get("GLUU_CONSUL_CACERT_FILE",
+                                         "/run/secrets/consul_cacert.pem")
+
+# abspath to Consul cert file
+GLUU_CONSUL_CERT_FILE = os.environ.get("GLUU_CONSUL_CERT_FILE",
+                                       "/run/secrets/consul_client.crt")
+
+# abspath to Consul key file
+GLUU_CONSUL_KEY_FILE = os.environ.get("GLUU_CONSUL_KEY_FILE",
+                                      "/run/secrets/consul_client.key")
+
+# abspath to Consul token file
+GLUU_CONSUL_TOKEN_FILE = os.environ.get("GLUU_CONSUL_TOKEN_FILE",
+                                        "/run/secrets/consul_token")
+
 # the namespace used for storing configmap
-GLUU_KUBERNETES_NAMESPACE = os.environ.get("GLUU_KUBERNETES_NAMESPACE", "default")
+GLUU_KUBERNETES_NAMESPACE = os.environ.get("GLUU_KUBERNETES_NAMESPACE",
+                                           "default")
 # the name of the configmap
 GLUU_KUBERNETES_CONFIGMAP = os.environ.get("GLUU_KUBERNETES_CONFIGMAP", "gluu")
+
+
+def as_boolean(val, default=False):
+    truthy = set(('t', 'T', 'true', 'True', 'TRUE', '1', 1, True))
+    falsy = set(('f', 'F', 'false', 'False', 'FALSE', '0', 0, False))
+
+    if val in truthy:
+        return True
+    if val in falsy:
+        return False
+    return default
 
 
 class BaseConfig(object):
@@ -67,9 +100,31 @@ class BaseConfig(object):
 class ConsulConfig(BaseConfig):
     def __init__(self):
         self.prefix = "gluu/config/"
-        self.client = Consul(host=GLUU_CONSUL_HOST,
-                             port=GLUU_CONSUL_PORT,
-                             consistency=GLUU_CONSUL_CONSISTENCY)
+
+        token = None
+        if os.path.isfile(GLUU_CONSUL_TOKEN_FILE):
+            with open(GLUU_CONSUL_TOKEN_FILE) as fr:
+                token = fr.read().strip()
+
+        cert = None
+        if all([os.path.isfile(GLUU_CONSUL_CERT_FILE),
+                os.path.isfile(GLUU_CONSUL_KEY_FILE)]):
+            cert = (GLUU_CONSUL_CERT_FILE, GLUU_CONSUL_KEY_FILE)
+
+        verify = as_boolean(GLUU_CONSUL_VERIFY)
+        # verify using CA cert
+        if os.path.isfile(GLUU_CONSUL_CACERT_FILE):
+            verify = GLUU_CONSUL_CACERT_FILE
+
+        self.client = Consul(
+            host=GLUU_CONSUL_HOST,
+            port=GLUU_CONSUL_PORT,
+            token=token,
+            scheme=GLUU_CONSUL_SCHEME,
+            consistency=GLUU_CONSUL_CONSISTENCY,
+            verify=verify,
+            cert=cert,
+        )
 
     def _merge_path(self, key):
         """Add prefix to the key.
@@ -179,9 +234,6 @@ class ConfigManager(object):
 
     def set(self, key, value):
         return self.adapter.set(key, value)
-
-    # def find(self, key):
-    #     return self.adapter.find(key)
 
     def all(self):
         return self.adapter.all()
