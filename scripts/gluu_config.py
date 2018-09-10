@@ -149,6 +149,10 @@ class ConsulConfig(BaseConfig):
     def find(self, key):
         _, resultset = self.client.kv.get(self._merge_path(key),
                                           recurse=True)
+
+        if not resultset:
+            return {}
+
         return {
             self._unmerge_path(item["Key"]): item["Value"]
             for item in resultset
