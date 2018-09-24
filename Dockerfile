@@ -30,15 +30,6 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# ====
-# misc
-# ====
-COPY scripts ./scripts
-COPY templates ./templates
-COPY static ./static
-
-RUN mkdir -p /etc/certs /opt/config-init/db
-
 ENV GLUU_CONFIG_ADAPTER consul
 ENV GLUU_CONSUL_HOST localhost
 ENV GLUU_CONSUL_PORT 8500
@@ -52,6 +43,15 @@ ENV GLUU_CONSUL_KEY_FILE /etc/certs/consul_client.key
 ENV GLUU_CONSUL_TOKEN_FILE /etc/certs/consul_token
 ENV GLUU_KUBERNETES_NAMESPACE default
 ENV GLUU_KUBERNETES_CONFIGMAP gluu
+
+# ====
+# misc
+# ====
+COPY scripts ./scripts
+COPY templates ./templates
+COPY static ./static
+
+RUN mkdir -p /etc/certs /opt/config-init/db
 
 ENTRYPOINT ["python", "./scripts/entrypoint.py"]
 CMD ["--help"]
