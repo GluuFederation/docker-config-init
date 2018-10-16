@@ -55,5 +55,9 @@ COPY static ./static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
 
+# allow root group to write files to directories below
+RUN chgrp -R 0 /etc/certs && chmod -R g=u /etc/certs \
+    && chgrp -R 0 /opt/config-init/db && chmod -R g=u /opt/config-init/db
+
 ENTRYPOINT ["sh", "./scripts/entrypoint.sh"]
 CMD ["--help"]
