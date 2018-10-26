@@ -1,13 +1,13 @@
 FROM registry.access.redhat.com/rhel7-minimal
 
-LABEL maintainer="Gluu Inc. <support@gluu.org>"
-
 # =============
 # RHEL packages
 # =============
-RUN microdnf --enablerepo=rhel-server-rhscl-7-rpms --enablerepo=rhel-7-server-rpms install \
-    python27-python-pip openssl wget java-1.8.0-openjdk-headless \
-    && microdnf update \
+
+RUN REPOLIST=rhel-7-server-rpms,rhel-server-rhscl-7-rpms \
+    INSTALL_PKGS="python27-python-pip openssl wget java-1.8.0-openjdk-headless shadow-utils" \
+    && microdnf -y update --enablerepo rhel-7-server-rpms --enablerepo rhel-server-rhscl-7-rpms --setopt=tsflags=nodocs \
+    && microdnf -y install --enablerepo rhel-7-server-rpms --enablerepo rhel-server-rhscl-7-rpms --setopt=tsflags=nodocs ${INSTALL_PKGS} \
     && microdnf clean all
 
 # ====
@@ -26,11 +26,22 @@ RUN wget -q https://ox.gluu.org/maven/org/xdi/oxShibbolethKeyGenerator/${OX_VERS
 # Python
 # ======
 
-WORKDIR /opt/config-init
-COPY requirements.txt ./
+COPY requirements.txt /tmp/requirements.txt
 RUN source scl_source enable python27 \
     && pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r /tmp/requirements.txt
+
+# ====
+# misc
+# ====
+
+LABEL name="config-init" \
+    maintainer="Gluu Inc. <support@gluu.org>" \
+    vendor="Gluu Federation" \
+    version="3.1.4" \
+    release="01" \
+    summary="Gluu's config-init app" \
+    description="Generate, load, or dump cluster-wide configuration"
 
 ENV GLUU_CONFIG_ADAPTER consul
 ENV GLUU_CONSUL_HOST localhost
@@ -46,18 +57,20 @@ ENV GLUU_CONSUL_TOKEN_FILE /etc/certs/consul_token
 ENV GLUU_KUBERNETES_NAMESPACE default
 ENV GLUU_KUBERNETES_CONFIGMAP gluu
 
-# ====
-# misc
-# ====
-COPY scripts ./scripts
-COPY templates ./templates
-COPY static ./static
+COPY LICENSE /licenses
+COPY scripts /opt/config-init/scripts
+COPY templates /opt/config-init/templates
+COPY static /opt/config-init/static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
+# create gluu user
+RUN useradd -ms /bin/sh gluu
+# adjust ownership
+RUN chown -R root:gluu /etc/certs \
+    && chown -R gluu:gluu /opt/config-init \
+    && chmod -R g+w /etc/certs
 
-# allow root group to write files to directories below
-RUN chgrp -R 0 /etc/certs && chmod -R g=u /etc/certs \
-    && chgrp -R 0 /opt/config-init/db && chmod -R g=u /opt/config-init/db
-
-ENTRYPOINT ["sh", "./scripts/entrypoint.sh"]
+# run the entrypoint as gluu user
+USER gluu
+ENTRYPOINT ["sh", "/opt/config-init/scripts/entrypoint.sh"]
 CMD ["--help"]
