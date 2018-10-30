@@ -63,14 +63,18 @@ COPY templates /opt/config-init/templates
 COPY static /opt/config-init/static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
+
 # create gluu user
-RUN useradd -ms /bin/sh gluu
+RUN useradd -ms /bin/sh --uid 1000 gluu \
+    && usermod -a -G root gluu
+
 # adjust ownership
-RUN chown -R root:gluu /etc/certs \
-    && chown -R gluu:gluu /opt/config-init \
-    && chmod -R g+w /etc/certs
+RUN chown -R 1000:1000 /opt/config-init \
+    && chgrp -R 0 /opt/config-init && chmod -R g=u /opt/config-init \
+    && chgrp -R 0 /etc/certs && chmod -R g=u /etc/certs
 
 # run the entrypoint as gluu user
-USER gluu
+USER 1000
+
 ENTRYPOINT ["sh", "/opt/config-init/scripts/entrypoint.sh"]
 CMD ["--help"]
