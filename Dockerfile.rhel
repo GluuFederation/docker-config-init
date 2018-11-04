@@ -57,7 +57,10 @@ ENV GLUU_CONSUL_TOKEN_FILE /etc/certs/consul_token
 ENV GLUU_KUBERNETES_NAMESPACE default
 ENV GLUU_KUBERNETES_CONFIGMAP gluu
 
-COPY LICENSE /licenses
+# license
+RUN mkdir -p /licenses
+COPY LICENSE /licenses/MIT.txt
+
 COPY scripts /opt/config-init/scripts
 COPY templates /opt/config-init/templates
 COPY static /opt/config-init/static
