@@ -2,6 +2,12 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.1.4_02
+
+Released on November 28th, 2018.
+
+* Fixed issue with single-quotation when generating certificate.
+
 ## Version 3.1.4_01
 
 Released on November 12th, 2018.
