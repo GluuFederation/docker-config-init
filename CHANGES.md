@@ -2,6 +2,24 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.1.4_03
+
+Released on December 2nd, 2018.
+
+* Removed Casa scripts from distribution.
+
+## Version 3.1.4_02
+
+Released on November 28th, 2018.
+
+* Fixed issue with single-quotation when generating certificate.
+
+## Version 3.1.4_01
+
+Released on November 12th, 2018.
+
+* Upgraded to Gluu Server 3.1.4.
+
 ## Version 3.1.3_06
 
 Released on September 18th, 2018.

@@ -725,7 +725,8 @@ def generate_ssl_certkey(suffix, passwd, email, domain, org_name,
         "-new",
         "-key /etc/certs/{}.key".format(suffix),
         "-out /etc/certs/{}.csr".format(suffix),
-        "-subj /C='{}'/ST='{}'/L='{}'/O='{}'/CN='{}'/emailAddress='{}'".format(country_code, state, city, org_name, domain, email),
+        """-subj /C="{}"/ST="{}"/L="{}"/O="{}"/CN="{}"/emailAddress='{}'""".format(country_code, state, city, org_name, domain, email),
+
     ]))
     assert retcode == 0, "Failed to generate SSL CSR; reason={}".format(err)
 
