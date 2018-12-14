@@ -8,6 +8,7 @@ LABEL maintainer="Gluu Inc. <support@gluu.org>"
 RUN apk update && apk add --no-cache \
     openssl \
     py-pip \
+    shadow \
     wget
 
 # ====
@@ -48,11 +49,24 @@ ENV GLUU_KUBERNETES_CONFIGMAP gluu
 # ====
 # misc
 # ====
-COPY scripts ./scripts
-COPY templates ./templates
-COPY static ./static
+
+COPY scripts /opt/config-init/scripts
+COPY templates /opt/config-init/templates
+COPY static /opt/config-init/static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
+
+# create gluu user
+RUN useradd -ms /bin/sh --uid 1000 gluu \
+    && usermod -a -G root gluu
+
+# adjust ownership
+RUN chown -R 1000:1000 /opt/config-init \
+    && chgrp -R 0 /opt/config-init && chmod -R g=u /opt/config-init \
+    && chgrp -R 0 /etc/certs && chmod -R g=u /etc/certs
+
+# run the entrypoint as gluu user
+USER 1000
 
 ENTRYPOINT ["python", "./scripts/entrypoint.py"]
 CMD ["--help"]
