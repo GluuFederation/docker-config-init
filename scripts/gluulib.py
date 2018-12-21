@@ -1,29 +1,25 @@
 import json
 import logging
 import os
-
-import six
-# import kubernetes.client
-# import kubernetes.config
-from consul import Consul
+from collections import namedtuple
 
 import hvac
+import six
+import kubernetes.client
+import kubernetes.config
+from consul import Consul
 
-logger = logging.getLogger("gluu_config")
+logger = logging.getLogger("gluulib")
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 fmt = logging.Formatter('%(levelname)s - %(asctime)s - %(message)s')
 ch.setFormatter(fmt)
 logger.addHandler(ch)
 
-# # the namespace used for storing configmap
-# GLUU_KUBERNETES_NAMESPACE = os.environ.get("GLUU_KUBERNETES_NAMESPACE",
-#                                            "default")
-# # the name of the configmap
-# GLUU_KUBERNETES_CONFIGMAP = os.environ.get("GLUU_KUBERNETES_CONFIGMAP", "gluu")
-
 
 def as_boolean(val, default=False):
+    """Converts value as boolean.
+    """
     truthy = set(('t', 'T', 'true', 'True', 'TRUE', '1', 1, True))
     falsy = set(('f', 'F', 'false', 'False', 'FALSE', '0', 0, False))
 
@@ -212,80 +208,94 @@ class ConsulConfig(BaseConfig):
             )
 
 
-# class KubernetesConfig(BaseConfig):
-#     def __init__(self):
-#         kubernetes.config.load_incluster_config()
-#         self.client = kubernetes.client.CoreV1Api()
-#         self.name_exists = False
+class KubernetesConfig(BaseConfig):
+    def __init__(self):
+        self.settings = {
+            k: v for k, v in os.environ.iteritems()
+            if k.isupper() and k.startswith("GLUU_CONFIG_KUBERNETES_")
+        }
+        self.settings.setdefault(
+            "GLUU_CONFIG_KUBERNETES_NAMESPACE",
+            # backward-compat with Gluu Server v3.1.4
+            os.environ.get("GLUU_KUBERNETES_NAMESPACE", "default"),
+        )
 
-#     def get(self, key, default=None):
-#         result = self.all()
-#         return result.get(key, default)
+        self.settings.setdefault(
+            "GLUU_CONFIG_KUBERNETES_CONFIGMAP",
+            # backward-compat with Gluu Server v3.1.4
+            os.environ.get("GLUU_KUBERNETES_CONFIGMAP", "gluu"),
+        )
 
-#     def _prepare_configmap(self):
-#         # create a configmap name if not exist
-#         if not self.name_exists:
-#             try:
-#                 self.client.read_namespaced_config_map(
-#                     GLUU_KUBERNETES_CONFIGMAP,
-#                     GLUU_KUBERNETES_NAMESPACE)
-#                 self.name_exists = True
-#             except kubernetes.client.rest.ApiException as exc:
-#                 if exc.status == 404:
-#                     # create the configmaps name
-#                     body = {
-#                         "kind": "ConfigMap",
-#                         "apiVersion": "v1",
-#                         "metadata": {
-#                             "name": GLUU_KUBERNETES_CONFIGMAP,
-#                         },
-#                         "data": {},
-#                     }
-#                     created = self.client.create_namespaced_config_map(
-#                         GLUU_KUBERNETES_NAMESPACE,
-#                         body)
-#                     if created:
-#                         self.name_exists = True
-#                 else:
-#                     raise
+        kubernetes.config.load_incluster_config()
+        self.client = kubernetes.client.CoreV1Api()
+        self.name_exists = False
 
-#     def set(self, key, value):
-#         self._prepare_configmap()
-#         body = {
-#             "kind": "ConfigMap",
-#             "apiVersion": "v1",
-#             "metadata": {
-#                 "name": GLUU_KUBERNETES_CONFIGMAP,
-#             },
-#             "data": {
-#                 key: self._prepare_value(value),
-#             }
-#         }
-#         return self.client.patch_namespaced_config_map(
-#             GLUU_KUBERNETES_CONFIGMAP,
-#             GLUU_KUBERNETES_NAMESPACE,
-#             body=body)
+    def get(self, key, default=None):
+        result = self.all()
+        return result.get(key, default)
 
-#     def all(self):
-#         self._prepare_configmap()
-#         result = self.client.read_namespaced_config_map(
-#             GLUU_KUBERNETES_CONFIGMAP,
-#             GLUU_KUBERNETES_NAMESPACE)
-#         return result.data or {}
+    def _prepare_configmap(self):
+        # create a configmap name if not exist
+        if not self.name_exists:
+            try:
+                self.client.read_namespaced_config_map(
+                    self.settings["GLUU_CONFIG_KUBERNETES_CONFIGMAP"],
+                    self.settings["GLUU_CONFIG_KUBERNETES_NAMESPACE"])
+                self.name_exists = True
+            except kubernetes.client.rest.ApiException as exc:
+                if exc.status == 404:
+                    # create the configmaps name
+                    body = {
+                        "kind": "ConfigMap",
+                        "apiVersion": "v1",
+                        "metadata": {
+                            "name": self.settings["GLUU_CONFIG_KUBERNETES_CONFIGMAP"],
+                        },
+                        "data": {},
+                    }
+                    created = self.client.create_namespaced_config_map(
+                        self.settings["GLUU_CONFIG_KUBERNETES_NAMESPACE"],
+                        body)
+                    if created:
+                        self.name_exists = True
+                else:
+                    raise
+
+    def set(self, key, value):
+        self._prepare_configmap()
+        body = {
+            "kind": "ConfigMap",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": self.settings["GLUU_CONFIG_KUBERNETES_CONFIGMAP"],
+            },
+            "data": {
+                key: self._prepare_value(value),
+            }
+        }
+        return self.client.patch_namespaced_config_map(
+            self.settings["GLUU_CONFIG_KUBERNETES_CONFIGMAP"],
+            self.settings["GLUU_CONFIG_KUBERNETES_NAMESPACE"],
+            body=body)
+
+    def all(self):
+        self._prepare_configmap()
+        result = self.client.read_namespaced_config_map(
+            self.settings["GLUU_CONFIG_KUBERNETES_CONFIGMAP"],
+            self.settings["GLUU_CONFIG_KUBERNETES_NAMESPACE"])
+        return result.data or {}
 
 
 class ConfigManager(object):
-    settings = {}
-
     def __init__(self):
-        self.settings["GLUU_CONFIG_ADAPTER"] = os.environ.get(
+        _adapter = os.environ.get(
             "GLUU_CONFIG_ADAPTER",
             "consul",
         )
-        if self.settings["GLUU_CONFIG_ADAPTER"] == "consul":
+        if _adapter == "consul":
             self.adapter = ConsulConfig()
-        # elif self.settings["GLUU_CONFIG_ADAPTER"] == "kubernetes":
-        #     self.adapter = KubernetesConfig()
+        elif _adapter == "kubernetes":
+            self.adapter = KubernetesConfig()
         else:
             self.adapter = None
 
@@ -419,23 +429,45 @@ class VaultSecret(BaseSecret):
 
 
 class SecretManager(object):
-    settings = {}
-
-    def __init__(self):
-        self.settings["GLUU_SECRET_ADAPTER"] = os.environ.get(
+    def __init__(self, config_adapter=None):
+        _adapter = os.environ.get(
             "GLUU_SECRET_ADAPTER",
             "vault",
         )
-        if self.settings["GLUU_SECRET_ADAPTER"] == "vault":
+        if _adapter == "vault":
             self.adapter = VaultSecret()
         else:
             self.adapter = None
 
+        # backward-compat
+        self.config_adapter = config_adapter
+
+    def _get_compat(self, key, default=None):
+        sc = self.adapter.get(key, default)
+
+        if not sc and self.config_adapter:
+            # tries to get from old config
+            sc = self.config_adapter.get(key, default)
+
+        if not sc:
+            # fallback to default
+            sc = default
+        return sc
+
     def get(self, key, default=None):
-        return self.adapter.get(key, default)
+        return self._get_compat(key, default)
 
     def set(self, key, value):
         return self.adapter.set(key, value)
 
     def all(self):
         return self.adapter.all()
+
+
+def get_manager():
+    """Convenient function to get manager instances.
+    """
+    obj = namedtuple("Manager", "config secret")
+    config_mgr = ConfigManager()
+    secret_mgr = SecretManager(config_mgr)
+    return obj(config=config_mgr, secret=secret_mgr)
