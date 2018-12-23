@@ -31,6 +31,12 @@ def as_boolean(val, default=False):
     return default
 
 
+def safe_value(value):
+    if not isinstance(value, (six.string_types, six.binary_type)):
+        value = json.dumps(value)
+    return value
+
+
 class BaseConfig(object):
     """Base class for config adapter. Must be sub-classed per
     implementation details.
@@ -56,11 +62,6 @@ class BaseConfig(object):
         Subclass __MUST__ implement this method.
         """
         raise NotImplementedError
-
-    def _prepare_value(self, value):
-        if not isinstance(value, (six.string_types, six.binary_type)):
-            value = json.dumps(value)
-        return value
 
 
 class ConsulConfig(BaseConfig):
@@ -181,7 +182,7 @@ class ConsulConfig(BaseConfig):
 
     def set(self, key, value):
         return self.client.kv.put(self._merge_path(key),
-                                  self._prepare_value(value))
+                                  safe_value(value))
 
     def find(self, key):
         _, resultset = self.client.kv.get(self._merge_path(key),
@@ -227,7 +228,11 @@ class KubernetesConfig(BaseConfig):
             os.environ.get("GLUU_KUBERNETES_CONFIGMAP", "gluu"),
         )
 
-        kubernetes.config.load_incluster_config()
+        if as_boolean(self.settings["GLUU_CONFIG_KUBERNETES_USE_KUBE_CONFIG"]):
+            kubernetes.config.load_kube_config()
+        else:
+            kubernetes.config.load_incluster_config()
+
         self.client = kubernetes.client.CoreV1Api()
         self.name_exists = False
 
@@ -271,7 +276,7 @@ class KubernetesConfig(BaseConfig):
                 "name": self.settings["GLUU_CONFIG_KUBERNETES_CONFIGMAP"],
             },
             "data": {
-                key: self._prepare_value(value),
+                key: safe_value(value),
             }
         }
         return self.client.patch_namespaced_config_map(
@@ -335,11 +340,6 @@ class BaseSecret(object):
         Subclass __MUST__ implement this method.
         """
         raise NotImplementedError
-
-    def _prepare_value(self, value):
-        if not isinstance(value, (six.string_types, six.binary_type)):
-            value = json.dumps(value)
-        return value
 
 
 class VaultSecret(BaseSecret):
