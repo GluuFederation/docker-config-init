@@ -23,6 +23,14 @@ RUN mkdir -p /opt/config-init/javalibs
 RUN wget -q https://ox.gluu.org/maven/org/xdi/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/oxauth-client.jar
 RUN wget -q https://ox.gluu.org/maven/org/xdi/oxShibbolethKeyGenerator/${OX_VERSION}/oxShibbolethKeyGenerator-${OX_VERSION}.jar -O /opt/config-init/javalibs/idp3_cml_keygenerator.jar
 
+# ====
+# Tini
+# ====
+
+ENV TINI_VERSION v0.18.0
+RUN wget -q https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static -O /usr/bin/tini \
+&& chmod +x /usr/bin/tini
+
 # ======
 # Python
 # ======
@@ -55,6 +63,7 @@ COPY templates /opt/config-init/templates
 COPY static /opt/config-init/static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
+RUN chmod +x /opt/config-init/scripts/entrypoint.sh
 
 # create gluu user
 RUN useradd -ms /bin/sh --uid 1000 gluu \
@@ -68,5 +77,5 @@ RUN chown -R 1000:1000 /opt/config-init \
 # run the entrypoint as gluu user
 USER 1000
 
-ENTRYPOINT ["python", "./scripts/entrypoint.py"]
+ENTRYPOINT ["tini", "-g", "--", "/opt/config-init/scripts/entrypoint.sh"]
 CMD ["--help"]

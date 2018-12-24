@@ -7,26 +7,22 @@ import re
 import shlex
 import string
 import subprocess
-import sys
 import time
 import uuid
 
 import click
 import pyDes
 
-from gluu_config import ConfigManager
+from gluulib import get_manager
+from wait_for import wait_for
 
-
-MAX_WAIT_SECONDS = 300
-SLEEP_DURATION = 5
-GLUU_OVERWRITE_ALL = os.environ.get("GLUU_OVERWRITE_ALL", False)
 
 # Default charset
 _DEFAULT_CHARS = "".join([string.ascii_uppercase,
                           string.digits,
                           string.lowercase])
 
-config_manager = ConfigManager()
+manager = get_manager()
 
 
 def get_random_chars(size=12, chars=_DEFAULT_CHARS):
@@ -809,25 +805,6 @@ def gen_idp3_key(shibJksPass):
     return out, err, retcode
 
 
-def wait_for_config(config_manager):
-    for i in range(0, MAX_WAIT_SECONDS, SLEEP_DURATION):
-        try:
-            # we don't care about the result, we only need to test
-            # the connection
-            config_manager.get("hostname")
-            click.echo("Config backend is ready.")
-            return
-        except Exception as exc:
-            click.echo(exc)
-            click.echo(
-                "Config backend is not ready, retrying in {} seconds.".format(
-                    SLEEP_DURATION))
-        time.sleep(SLEEP_DURATION)
-
-    click.echo("Config backend is not ready after {} seconds.".format(MAX_WAIT_SECONDS))
-    sys.exit(1)
-
-
 @click.group()
 def cli():
     pass
@@ -850,7 +827,7 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city,
              ldap_type, path, base_inum, inum_org, inum_appliance):
     """Generates initial configuration and save them into KV.
     """
-    wait_for_config(config_manager)
+    wait_for(manager)
 
     click.echo("Generating config.")
     # tolerancy before checking existing key
@@ -861,7 +838,7 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city,
 
     click.echo("Saving config.")
     for k, v in cfg.iteritems():
-        config_manager.set(k, v)
+        manager.config.set(k, v)
     click.echo("Config saved to backend")
 
     cfg = {"_config": cfg}
@@ -876,8 +853,6 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city,
 def load(path):
     """Loads configuration from JSON file and save them into KV.
     """
-    wait_for_config(config_manager)
-
     click.echo("Loading config.")
     with open(path, "r") as f:
         cfg = json.loads(f.read())
@@ -891,7 +866,7 @@ def load(path):
     time.sleep(5)
     for k, v in cfg["_config"].iteritems():
         v = set_keyval(k, v)
-        config_manager.set(k, v)
+        manager.config.set(k, v)
     click.echo("Config successfully loaded from {}".format(path))
 
 
@@ -900,10 +875,8 @@ def load(path):
 def dump(path):
     """Dumps configuration from KV and save them into JSON file.
     """
-    wait_for_config(config_manager)
-
     click.echo("Saving config.")
-    cfg = {"_config": config_manager.all()}
+    cfg = {"_config": manager.config.all()}
     cfg = json.dumps(cfg, indent=4)
     with open(path, "w") as f:
         f.write(cfg)
@@ -912,13 +885,13 @@ def dump(path):
 
 def set_keyval(key, value):
     # check existing value first
-    _value = config_manager.get(key)
+    _value = manager.config.get(key)
 
-    overwrite_all = as_boolean(GLUU_OVERWRITE_ALL)
+    overwrite_all = as_boolean(os.environ.get("GLUU_OVERWRITE_ALL", False))
 
     if overwrite_all:
         click.echo("  updating key {!r}".format(key))
-        config_manager.set(key, value)
+        manager.config.set(key, value)
     elif _value:
         click.echo("  ignoring existing key {!r}".format(key))
         value = _value
