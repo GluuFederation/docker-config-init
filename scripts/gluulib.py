@@ -357,7 +357,7 @@ class VaultSecret(BaseSecret):
             "/run/secrets/vault_role_id",
         ),
         self.settings.setdefault(
-            "GLUU_SECRET_VAULT_ROLE_ID_FILE",
+            "GLUU_SECRET_VAULT_SECRET_ID_FILE",
             "/run/secrets/vault_secret_id",
         )
         self.settings.setdefault(
@@ -413,13 +413,7 @@ class VaultSecret(BaseSecret):
     def _authenticate(self):
         if self.client.is_authenticated():
             return
-
-        try:
-            self.client.auth_approle(self.role_id, self.secret_id)
-        except (hvac.exceptions.InvalidRequest,
-                hvac.exceptions.VaultDown) as exc:
-            raise RuntimeError("Unable to authenticate; "
-                               "reason={}".format(exc))
+        self.client.auth_approle(self.role_id, self.secret_id)
 
     def get(self, key, default=None):
         self._authenticate()
