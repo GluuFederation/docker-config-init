@@ -534,6 +534,8 @@ class SecretManager(object):
         if not sc and self.config_adapter:
             # tries to get from old config
             sc = self.config_adapter.get(key, default)
+            # migrate to secret adapter
+            self.adapter.set(key, sc)
 
         if not sc:
             # fallback to default
