@@ -9,7 +9,7 @@ import string
 import subprocess
 import time
 import uuid
-# from collections import namedtuple
+from collections import namedtuple
 from functools import partial
 
 import click
@@ -184,11 +184,17 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     ctx = {"config": {}, "secret": {}}
 
     ctx["secret"]["encoded_salt"] = get_or_set_secret("encoded_salt", get_random_chars(24))
+
     ctx["config"]["orgName"] = get_or_set_config("orgName", org_name)
+
     ctx["config"]["country_code"] = get_or_set_config("country_code", country_code)
+
     ctx["config"]["state"] = get_or_set_config("state", state)
+
     ctx["config"]["city"] = get_or_set_config("city", city)
+
     ctx["config"]["hostname"] = get_or_set_config("hostname", domain)
+
     ctx["config"]["admin_email"] = get_or_set_config("admin_email", email)
 
     ctx["config"]["default_openid_jks_dn_name"] = get_or_set_config(
@@ -210,8 +216,11 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # LDAP
     # ====
     ctx["config"]["ldap_init_host"] = get_or_set_config("ldap_init_host", "localhost")
+
     ctx["config"]["ldap_init_port"] = int(get_or_set_config("ldap_init_port", 1636))
+
     ctx["config"]["ldap_port"] = int(get_or_set_config("ldap_port", 1389))
+
     ctx["config"]["ldaps_port"] = int(get_or_set_config("ldaps_port", 1636))
 
     ctx["secret"]["ldap_truststore_pass"] = get_or_set_secret(
@@ -228,8 +237,10 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
         ldap_site_binddn = "cn=directory manager,o=site"
         ldapTrustStoreFn = "/etc/certs/openldap.pkcs12"
 
-    ctx["secret"]["ldap_binddn"] = get_or_set_secret("ldap_binddn", ldap_binddn)
+    ctx["config"]["ldap_binddn"] = get_or_set_config("ldap_binddn", ldap_binddn)
+
     ctx["config"]["ldap_site_binddn"] = get_or_set_config("ldap_site_binddn", ldap_site_binddn)
+
     ctx["config"]["ldapTrustStoreFn"] = get_or_set_config("ldapTrustStoreFn", ldapTrustStoreFn)
 
     generate_ssl_certkey(
@@ -388,336 +399,375 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
             encrypt_text(fr.read(), ctx["secret"]["encoded_salt"])
         )
 
-    # # =======
-    # # SCIM RS
-    # # =======
-    # ctx["scim_rs_client_id"] = get_or_set(
-    #     "scim_rs_client_id",
-    #     "{}!0008!{}".format(ctx["inumOrg"], join_quad_str(2)),
-    # )
+    # =======
+    # SCIM RS
+    # =======
+    ctx["config"]["scim_rs_client_id"] = get_or_set_config(
+        "scim_rs_client_id",
+        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+    )
 
-    # ctx["scim_rs_client_jks_fn"] = get_or_set("scim_rs_client_jks_fn",
-    #                                           "/etc/certs/scim-rs.jks")
-    # ctx["scim_rs_client_jwks_fn"] = get_or_set("scim_rs_client_jwks_fn",
-    #                                            "/etc/certs/scim-rs-keys.json")
-    # ctx["scim_rs_client_jks_pass"] = get_or_set(
-    #     "scim_rs_client_jks_pass", get_random_chars())
+    ctx["config"]["scim_rs_client_jks_fn"] = get_or_set_config(
+        "scim_rs_client_jks_fn", "/etc/certs/scim-rs.jks")
 
-    # ctx["scim_rs_client_jks_pass_encoded"] = get_or_set(
-    #     "scim_rs_client_jks_pass_encoded",
-    #     encrypt_text(ctx["scim_rs_client_jks_pass"], ctx["encoded_salt"]),
-    # )
+    ctx["config"]["scim_rs_client_jwks_fn"] = get_or_set_config(
+        "scim_rs_client_jwks_fn", "/etc/certs/scim-rs-keys.json")
 
-    # generate_openid_keys(
-    #     ctx["scim_rs_client_jks_pass"],
-    #     ctx["scim_rs_client_jks_fn"],
-    #     ctx["scim_rs_client_jwks_fn"],
-    #     ctx["default_openid_jks_dn_name"],
-    # )
+    ctx["secret"]["scim_rs_client_jks_pass"] = get_or_set_secret(
+        "scim_rs_client_jks_pass", get_random_chars())
 
-    # basedir, fn = os.path.split(ctx["scim_rs_client_jwks_fn"])
-    # ctx["scim_rs_client_base64_jwks"] = get_or_set(
-    #     "scim_rs_client_base64_jwks",
-    #     encode_template(fn, ctx, basedir),
-    # )
+    ctx["secret"]["scim_rs_client_jks_pass_encoded"] = get_or_set_secret(
+        "scim_rs_client_jks_pass_encoded",
+        encrypt_text(ctx["secret"]["scim_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+    )
 
-    # with open(ctx["scim_rs_client_jks_fn"], "rb") as fr:
-    #     ctx["scim_rs_jks_base64"] = get_or_set(
-    #         "scim_rs_jks_base64",
-    #         encrypt_text(fr.read(), ctx["encoded_salt"]),
-    #     )
+    generate_openid_keys(
+        ctx["secret"]["scim_rs_client_jks_pass"],
+        ctx["config"]["scim_rs_client_jks_fn"],
+        ctx["config"]["scim_rs_client_jwks_fn"],
+        ctx["config"]["default_openid_jks_dn_name"],
+    )
 
-    # # =======
-    # # SCIM RP
-    # # =======
-    # ctx["scim_rp_client_id"] = get_or_set(
-    #     "scim_rp_client_id",
-    #     "{}!0008!{}".format(ctx["inumOrg"], join_quad_str(2)),
-    # )
+    basedir, fn = os.path.split(ctx["config"]["scim_rs_client_jwks_fn"])
+    ctx["secret"]["scim_rs_client_base64_jwks"] = get_or_set_secret(
+        "scim_rs_client_base64_jwks",
+        encode_template(fn, ctx, basedir),
+    )
 
-    # ctx["scim_rp_client_jks_fn"] = get_or_set("scim_rp_client_jks_fn", "/etc/certs/scim-rp.jks")
-    # ctx["scim_rp_client_jwks_fn"] = get_or_set("scim_rp_client_jwks_fn", "/etc/certs/scim-rp-keys.json")
-    # ctx["scim_rp_client_jks_pass"] = get_or_set("scim_rp_client_jks_pass", get_random_chars())
+    with open(ctx["config"]["scim_rs_client_jks_fn"], "rb") as fr:
+        ctx["secret"]["scim_rs_jks_base64"] = get_or_set_secret(
+            "scim_rs_jks_base64",
+            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+        )
 
-    # ctx["scim_rp_client_jks_pass_encoded"] = get_or_set(
-    #     "scim_rp_client_jks_pass_encoded",
-    #     encrypt_text(ctx["scim_rp_client_jks_pass"], ctx["encoded_salt"]),
-    # )
+    # =======
+    # SCIM RP
+    # =======
+    ctx["config"]["scim_rp_client_id"] = get_or_set_config(
+        "scim_rp_client_id",
+        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+    )
 
-    # generate_openid_keys(
-    #     ctx["scim_rp_client_jks_pass"],
-    #     ctx["scim_rp_client_jks_fn"],
-    #     ctx["scim_rp_client_jwks_fn"],
-    #     ctx["default_openid_jks_dn_name"],
-    # )
+    ctx["config"]["scim_rp_client_jks_fn"] = get_or_set_config(
+        "scim_rp_client_jks_fn", "/etc/certs/scim-rp.jks")
 
-    # basedir, fn = os.path.split(ctx["scim_rp_client_jwks_fn"])
-    # ctx["scim_rp_client_base64_jwks"] = get_or_set(
-    #     "scim_rp_client_base64_jwks",
-    #     encode_template(fn, ctx, basedir),
-    # )
+    ctx["config"]["scim_rp_client_jwks_fn"] = get_or_set_config(
+        "scim_rp_client_jwks_fn", "/etc/certs/scim-rp-keys.json")
 
-    # with open(ctx["scim_rp_client_jks_fn"], "rb") as fr:
-    #     ctx["scim_rp_jks_base64"] = get_or_set(
-    #         "scim_rp_jks_base64",
-    #         encrypt_text(fr.read(), ctx["encoded_salt"]),
-    #     )
+    ctx["secret"]["scim_rp_client_jks_pass"] = get_or_set_secret(
+        "scim_rp_client_jks_pass", get_random_chars())
 
-    # # ===========
-    # # Passport RS
-    # # ===========
-    # ctx["passport_rs_client_id"] = get_or_set(
-    #     "passport_rs_client_id",
-    #     "{}!0008!{}".format(ctx["inumOrg"], join_quad_str(2)),
-    # )
+    ctx["secret"]["scim_rp_client_jks_pass_encoded"] = get_or_set_secret(
+        "scim_rp_client_jks_pass_encoded",
+        encrypt_text(ctx["secret"]["scim_rp_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+    )
 
-    # ctx["passport_rs_client_jks_fn"] = get_or_set("passport_rs_client_jks_fn", "/etc/certs/passport-rs.jks")
-    # ctx["passport_rs_client_jwks_fn"] = get_or_set("passport_rs_client_jwks_fn", "/etc/certs/passport-rs-keys.json")
-    # ctx["passport_rs_client_jks_pass"] = get_or_set(
-    #     "passport_rs_client_jks_pass", get_random_chars())
+    generate_openid_keys(
+        ctx["secret"]["scim_rp_client_jks_pass"],
+        ctx["config"]["scim_rp_client_jks_fn"],
+        ctx["config"]["scim_rp_client_jwks_fn"],
+        ctx["config"]["default_openid_jks_dn_name"],
+    )
 
-    # ctx["passport_rs_client_jks_pass_encoded"] = get_or_set(
-    #     "passport_rs_client_jks_pass_encoded",
-    #     encrypt_text(ctx["passport_rs_client_jks_pass"], ctx["encoded_salt"]),
-    # )
+    basedir, fn = os.path.split(ctx["config"]["scim_rp_client_jwks_fn"])
+    ctx["secret"]["scim_rp_client_base64_jwks"] = get_or_set_secret(
+        "scim_rp_client_base64_jwks",
+        encode_template(fn, ctx, basedir),
+    )
 
-    # generate_openid_keys(
-    #     ctx["passport_rs_client_jks_pass"],
-    #     ctx["passport_rs_client_jks_fn"],
-    #     ctx["passport_rs_client_jwks_fn"],
-    #     ctx["default_openid_jks_dn_name"],
-    # )
+    with open(ctx["config"]["scim_rp_client_jks_fn"], "rb") as fr:
+        ctx["secret"]["scim_rp_jks_base64"] = get_or_set_secret(
+            "scim_rp_jks_base64",
+            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+        )
 
-    # basedir, fn = os.path.split(ctx["passport_rs_client_jwks_fn"])
-    # ctx["passport_rs_client_base64_jwks"] = get_or_set(
-    #     "passport_rs_client_base64_jwks",
-    #     encode_template(fn, ctx, basedir),
-    # )
+    # ===========
+    # Passport RS
+    # ===========
+    ctx["config"]["passport_rs_client_id"] = get_or_set_config(
+        "passport_rs_client_id",
+        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+    )
 
-    # with open(ctx["passport_rs_client_jks_fn"], "rb") as fr:
-    #     ctx["passport_rs_jks_base64"] = get_or_set(
-    #         "passport_rs_jks_base64",
-    #         encrypt_text(fr.read(), ctx["encoded_salt"])
-    #     )
+    ctx["config"]["passport_rs_client_jks_fn"] = get_or_set_config(
+        "passport_rs_client_jks_fn", "/etc/certs/passport-rs.jks")
 
-    # # ===========
-    # # Passport RP
-    # # ===========
-    # ctx["passport_rp_client_id"] = get_or_set(
-    #     "passport_rp_client_id",
-    #     "{}!0008!{}".format(ctx["inumOrg"], join_quad_str(2)),
-    # )
+    ctx["config"]["passport_rs_client_jwks_fn"] = get_or_set_config(
+        "passport_rs_client_jwks_fn", "/etc/certs/passport-rs-keys.json")
 
-    # ctx["passport_rp_client_jks_pass"] = get_or_set(
-    #     "passport_rp_client_jks_pass", get_random_chars())
-    # ctx["passport_rp_client_jks_fn"] = get_or_set("passport_rp_client_jks_fn", "/etc/certs/passport-rp.jks")
-    # ctx["passport_rp_client_jwks_fn"] = get_or_set("passport_rp_client_jwks_fn", "/etc/certs/passport-rp-keys.json")
-    # ctx["passport_rp_client_cert_fn"] = get_or_set("passport_rp_client_cert_fn", "/etc/certs/passport-rp.pem")
-    # ctx["passport_rp_client_cert_alg"] = get_or_set("passport_rp_client_cert_alg", "RS512")
+    ctx["secret"]["passport_rs_client_jks_pass"] = get_or_set_secret(
+        "passport_rs_client_jks_pass", get_random_chars())
 
-    # cert_alias = gen_export_openid_keys(
-    #     ctx["passport_rp_client_jks_pass"],
-    #     ctx["passport_rp_client_jks_fn"],
-    #     ctx["passport_rp_client_jwks_fn"],
-    #     ctx["default_openid_jks_dn_name"],
-    #     ctx["passport_rp_client_cert_alg"],
-    #     ctx["passport_rp_client_cert_fn"],
-    # )
+    ctx["secret"]["passport_rs_client_jks_pass_encoded"] = get_or_set_secret(
+        "passport_rs_client_jks_pass_encoded",
+        encrypt_text(ctx["secret"]["passport_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+    )
 
-    # basedir, fn = os.path.split(ctx["passport_rp_client_jwks_fn"])
-    # ctx["passport_rp_client_base64_jwks"] = get_or_set(
-    #     "passport_rp_client_base64_jwks",
-    #     encode_template(fn, ctx, basedir),
-    # )
+    generate_openid_keys(
+        ctx["secret"]["passport_rs_client_jks_pass"],
+        ctx["config"]["passport_rs_client_jks_fn"],
+        ctx["config"]["passport_rs_client_jwks_fn"],
+        ctx["config"]["default_openid_jks_dn_name"],
+    )
 
-    # ctx["passport_rp_client_cert_alias"] = get_or_set(
-    #     "passport_rp_client_cert_alias", cert_alias
-    # )
+    basedir, fn = os.path.split(ctx["config"]["passport_rs_client_jwks_fn"])
+    ctx["secret"]["passport_rs_client_base64_jwks"] = get_or_set_secret(
+        "passport_rs_client_base64_jwks",
+        encode_template(fn, ctx, basedir),
+    )
 
-    # with open(ctx["passport_rp_client_jks_fn"], "rb") as fr:
-    #     ctx["passport_rp_jks_base64"] = get_or_set(
-    #         "passport_rp_jks_base64",
-    #         encrypt_text(fr.read(), ctx["encoded_salt"]),
-    #     )
+    with open(ctx["config"]["passport_rs_client_jks_fn"], "rb") as fr:
+        ctx["secret"]["passport_rs_jks_base64"] = get_or_set_secret(
+            "passport_rs_jks_base64",
+            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"])
+        )
 
-    # with open(ctx["passport_rp_client_cert_fn"]) as fr:
-    #     ctx["passport_rp_client_cert_base64"] = get_or_set(
-    #         "passport_rp_client_cert_base64",
-    #         encrypt_text(fr.read(), ctx["encoded_salt"]),
-    #     )
+    # ===========
+    # Passport RP
+    # ===========
+    ctx["config"]["passport_rp_client_id"] = get_or_set_config(
+        "passport_rp_client_id",
+        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+    )
 
-    # # ===========
-    # # Passport SP
-    # # ===========
+    ctx["secret"]["passport_rp_client_jks_pass"] = get_or_set_secret(
+        "passport_rp_client_jks_pass", get_random_chars())
 
-    # ctx["passportSpKeyPass"] = get_or_set("passportSpKeyPass", get_random_chars())
-    # ctx["passportSpTLSCACert"] = get_or_set("passportSpTLSCACert", '/etc/certs/passport-sp.pem')
-    # ctx["passportSpTLSCert"] = get_or_set("passportSpTLSCert", '/etc/certs/passport-sp.crt')
-    # ctx["passportSpTLSKey"] = get_or_set("passportSpTLSKey", '/etc/certs/passport-sp.key')
-    # ctx["passportSpJksPass"] = get_or_set("passportSpJksPass", get_random_chars())
-    # ctx["passportSpJksFn"] = get_or_set("passportSpJksFn", '/etc/certs/passport-sp.jks')
+    ctx["config"]["passport_rp_client_jks_fn"] = get_or_set_config(
+        "passport_rp_client_jks_fn", "/etc/certs/passport-rp.jks")
 
-    # generate_ssl_certkey(
-    #     "passport-sp",
-    #     ctx["passportSpKeyPass"],
-    #     ctx["admin_email"],
-    #     ctx["hostname"],
-    #     ctx["orgName"],
-    #     ctx["country_code"],
-    #     ctx["state"],
-    #     ctx["city"],
-    # )
-    # with open(ctx["passportSpTLSCert"]) as f:
-    #     ctx["passport_sp_cert_base64"] = get_or_set(
-    #         "passport_sp_cert_base64",
-    #         encrypt_text(f.read(), ctx["encoded_salt"])
-    #     )
-    # with open(ctx["passportSpTLSKey"]) as f:
-    #     ctx["passport_sp_key_base64"] = get_or_set(
-    #         "passport_sp_key_base64",
-    #         encrypt_text(f.read(), ctx["encoded_salt"])
-    #     )
+    ctx["config"]["passport_rp_client_jwks_fn"] = get_or_set_config(
+        "passport_rp_client_jwks_fn", "/etc/certs/passport-rp-keys.json")
 
-    # # ========
-    # # oxAsimba
-    # # ========
-    # ctx["oxasimba_config_base64"] = get_or_set(
-    #     "oxasimba_config_base64",
-    #     encode_template("oxasimba-config.json", ctx),
-    # )
+    ctx["config"]["passport_rp_client_cert_fn"] = get_or_set_config(
+        "passport_rp_client_cert_fn", "/etc/certs/passport-rp.pem")
 
-    # # ================
-    # # SSL cert and key
-    # # ================
-    # ssl_cert = "/etc/certs/gluu_https.crt"
-    # ssl_key = "/etc/certs/gluu_https.key"
+    ctx["config"]["passport_rp_client_cert_alg"] = get_or_set_config(
+        "passport_rp_client_cert_alg", "RS512")
 
-    # # generate self-signed SSL cert and key only if they aren't exist
-    # if not(os.path.exists(ssl_cert) and os.path.exists(ssl_key)):
-    #     generate_ssl_certkey(
-    #         "gluu_https",
-    #         admin_pw,
-    #         ctx["admin_email"],
-    #         ctx["hostname"],
-    #         ctx["orgName"],
-    #         ctx["country_code"],
-    #         ctx["state"],
-    #         ctx["city"],
-    #     )
+    cert_alias = gen_export_openid_keys(
+        ctx["secret"]["passport_rp_client_jks_pass"],
+        ctx["config"]["passport_rp_client_jks_fn"],
+        ctx["config"]["passport_rp_client_jwks_fn"],
+        ctx["config"]["default_openid_jks_dn_name"],
+        ctx["config"]["passport_rp_client_cert_alg"],
+        ctx["config"]["passport_rp_client_cert_fn"],
+    )
 
-    # with open(ssl_cert) as f:
-    #     ctx["ssl_cert"] = get_or_set("ssl_cert", f.read())
+    basedir, fn = os.path.split(ctx["config"]["passport_rp_client_jwks_fn"])
+    ctx["secret"]["passport_rp_client_base64_jwks"] = get_or_set_secret(
+        "passport_rp_client_base64_jwks",
+        encode_template(fn, ctx, basedir),
+    )
 
-    # with open(ssl_key) as f:
-    #     ctx["ssl_key"] = get_or_set("ssl_key", f.read())
+    ctx["config"]["passport_rp_client_cert_alias"] = get_or_set_config(
+        "passport_rp_client_cert_alias", cert_alias
+    )
 
-    # # ================
-    # # Extension config
-    # # ================
-    # ext_ctx = get_extension_config()
-    # ctx.update(ext_ctx)
+    with open(ctx["config"]["passport_rp_client_jks_fn"], "rb") as fr:
+        ctx["secret"]["passport_rp_jks_base64"] = get_or_set_secret(
+            "passport_rp_jks_base64",
+            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+        )
 
-    # # ===================
-    # # IDP3 (oxShibboleth)
-    # # ===================
-    # ctx["idp_client_id"] = get_or_set(
-    #     "idp_client_id",
-    #     "{}!0008!{}".format(ctx["inumOrg"], join_quad_str(2)),
-    # )
+    with open(ctx["config"]["passport_rp_client_cert_fn"]) as fr:
+        ctx["secret"]["passport_rp_client_cert_base64"] = get_or_set_secret(
+            "passport_rp_client_cert_base64",
+            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+        )
 
-    # ctx["idpClient_encoded_pw"] = get_or_set(
-    #     "idpClient_encoded_pw",
-    #     encrypt_text(get_random_chars(), ctx["encoded_salt"]),
-    # )
+    # ===========
+    # Passport SP
+    # ===========
 
-    # ctx["oxidp_config_base64"] = get_or_set(
-    #     "oxidp_config_base64",
-    #     encode_template("oxidp-config.json", ctx)
-    # )
+    ctx["secret"]["passportSpKeyPass"] = get_or_set_secret("passportSpKeyPass", get_random_chars())
 
-    # ctx["shibJksFn"] = get_or_set("shibJksFn", "/etc/certs/shibIDP.jks")
-    # ctx["shibJksPass"] = get_or_set("shibJksPass", get_random_chars())
+    ctx["config"]["passportSpTLSCACert"] = get_or_set_config("passportSpTLSCACert", '/etc/certs/passport-sp.pem')
 
-    # ctx["encoded_shib_jks_pw"] = get_or_set(
-    #     "encoded_shib_jks_pw",
-    #     encrypt_text(ctx["shibJksPass"], ctx["encoded_salt"])
-    # )
+    ctx["config"]["passportSpTLSCert"] = get_or_set_config("passportSpTLSCert", '/etc/certs/passport-sp.crt')
 
-    # generate_ssl_certkey(
-    #     "shibIDP",
-    #     ctx["shibJksPass"],
-    #     ctx["admin_email"],
-    #     ctx["hostname"],
-    #     ctx["orgName"],
-    #     ctx["country_code"],
-    #     ctx["state"],
-    #     ctx["city"],
-    # )
-    # generate_keystore("shibIDP", ctx["hostname"], ctx["shibJksPass"])
+    ctx["config"]["passportSpTLSKey"] = get_or_set_config("passportSpTLSKey", '/etc/certs/passport-sp.key')
 
-    # with open("/etc/certs/shibIDP.crt") as f:
-    #     ctx["shibIDP_cert"] = get_or_set(
-    #         "shibIDP_cert",
-    #         encrypt_text(f.read(), ctx["encoded_salt"])
-    #     )
+    ctx["secret"]["passportSpJksPass"] = get_or_set_secret("passportSpJksPass", get_random_chars())
 
-    # with open("/etc/certs/shibIDP.key") as f:
-    #     ctx["shibIDP_key"] = get_or_set(
-    #         "shibIDP_key",
-    #         encrypt_text(f.read(), ctx["encoded_salt"])
-    #     )
+    ctx["config"]["passportSpJksFn"] = get_or_set_config("passportSpJksFn", '/etc/certs/passport-sp.jks')
 
-    # with open(ctx["shibJksFn"]) as f:
-    #     ctx["shibIDP_jks_base64"] = get_or_set(
-    #         "shibIDP_jks_base64",
-    #         encrypt_text(f.read(), ctx["encoded_salt"])
-    #     )
+    generate_ssl_certkey(
+        "passport-sp",
+        ctx["secret"]["passportSpKeyPass"],
+        ctx["config"]["admin_email"],
+        ctx["config"]["hostname"],
+        ctx["config"]["orgName"],
+        ctx["config"]["country_code"],
+        ctx["config"]["state"],
+        ctx["config"]["city"],
+    )
+    with open(ctx["config"]["passportSpTLSCert"]) as f:
+        ctx["secret"]["passport_sp_cert_base64"] = get_or_set_secret(
+            "passport_sp_cert_base64",
+            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+        )
 
-    # ctx["shibboleth_version"] = get_or_set("shibboleth_version", "v3")
-    # ctx["idp3Folder"] = get_or_set("idp3Folder", "/opt/shibboleth-idp")
+    with open(ctx["config"]["passportSpTLSKey"]) as f:
+        ctx["secret"]["passport_sp_key_base64"] = get_or_set_secret(
+            "passport_sp_key_base64",
+            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+        )
 
-    # idp3_signing_cert = "/etc/certs/idp-signing.crt"
-    # idp3_signing_key = "/etc/certs/idp-signing.key"
-    # generate_ssl_certkey(
-    #     "idp-signing",
-    #     ctx["shibJksPass"],
-    #     ctx["admin_email"],
-    #     ctx["hostname"],
-    #     ctx["orgName"],
-    #     ctx["country_code"],
-    #     ctx["state"],
-    #     ctx["city"],
-    # )
+    # ========
+    # oxAsimba
+    # ========
+    ctx["secret"]["oxasimba_config_base64"] = get_or_set_secret(
+        "oxasimba_config_base64",
+        encode_template("oxasimba-config.json", ctx),
+    )
 
-    # with open(idp3_signing_cert) as f:
-    #     ctx["idp3SigningCertificateText"] = get_or_set("idp3SigningCertificateText", f.read())
-    # with open(idp3_signing_key) as f:
-    #     ctx["idp3SigningKeyText"] = get_or_set("idp3SigningKeyText", f.read())
+    # ================
+    # SSL cert and key
+    # ================
+    ssl_cert = "/etc/certs/gluu_https.crt"
+    ssl_key = "/etc/certs/gluu_https.key"
 
-    # idp3_encryption_cert = "/etc/certs/idp-encryption.crt"
-    # idp3_encryption_key = "/etc/certs/idp-encryption.key"
-    # generate_ssl_certkey(
-    #     "idp-encryption",
-    #     ctx["shibJksPass"],
-    #     ctx["admin_email"],
-    #     ctx["hostname"],
-    #     ctx["orgName"],
-    #     ctx["country_code"],
-    #     ctx["state"],
-    #     ctx["city"],
-    # )
+    # generate self-signed SSL cert and key only if they aren't exist
+    if not(os.path.exists(ssl_cert) and os.path.exists(ssl_key)):
+        generate_ssl_certkey(
+            "gluu_https",
+            admin_pw,
+            ctx["config"]["admin_email"],
+            ctx["config"]["hostname"],
+            ctx["config"]["orgName"],
+            ctx["config"]["country_code"],
+            ctx["config"]["state"],
+            ctx["config"]["city"],
+        )
 
-    # with open(idp3_encryption_cert) as f:
-    #     ctx["idp3EncryptionCertificateText"] = get_or_set("idp3EncryptionCertificateText", f.read())
-    # with open(idp3_encryption_key) as f:
-    #     ctx["idp3EncryptionKeyText"] = get_or_set("idp3EncryptionKeyText", f.read())
+    with open(ssl_cert) as f:
+        ctx["secret"]["ssl_cert"] = get_or_set_secret("ssl_cert", f.read())
 
-    # gen_idp3_key(ctx["shibJksPass"])
-    # with open("/etc/certs/sealer.jks") as f:
-    #     ctx["sealer_jks_base64"] = get_or_set(
-    #         "sealer_jks_base64",
-    #         encrypt_text(f.read(), ctx["encoded_salt"])
-    #     )
+    with open(ssl_key) as f:
+        ctx["secret"]["ssl_key"] = get_or_set_secret("ssl_key", f.read())
+
+    # ================
+    # Extension config
+    # ================
+    ext_ctx = get_extension_config()
+    ctx["config"].update(ext_ctx)
+
+    # ===================
+    # IDP3 (oxShibboleth)
+    # ===================
+    ctx["config"]["idp_client_id"] = get_or_set_config(
+        "idp_client_id",
+        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+    )
+
+    ctx["secret"]["idpClient_encoded_pw"] = get_or_set_secret(
+        "idpClient_encoded_pw",
+        encrypt_text(get_random_chars(), ctx["secret"]["encoded_salt"]),
+    )
+
+    ctx["secret"]["oxidp_config_base64"] = get_or_set_secret(
+        "oxidp_config_base64",
+        encode_template("oxidp-config.json", ctx)
+    )
+
+    ctx["config"]["shibJksFn"] = get_or_set_config("shibJksFn", "/etc/certs/shibIDP.jks")
+
+    ctx["secret"]["shibJksPass"] = get_or_set_secret("shibJksPass", get_random_chars())
+
+    ctx["secret"]["encoded_shib_jks_pw"] = get_or_set_secret(
+        "encoded_shib_jks_pw",
+        encrypt_text(ctx["secret"]["shibJksPass"], ctx["secret"]["encoded_salt"])
+    )
+
+    generate_ssl_certkey(
+        "shibIDP",
+        ctx["secret"]["shibJksPass"],
+        ctx["config"]["admin_email"],
+        ctx["config"]["hostname"],
+        ctx["config"]["orgName"],
+        ctx["config"]["country_code"],
+        ctx["config"]["state"],
+        ctx["config"]["city"],
+    )
+
+    generate_keystore("shibIDP", ctx["config"]["hostname"], ctx["secret"]["shibJksPass"])
+
+    with open("/etc/certs/shibIDP.crt") as f:
+        ctx["secret"]["shibIDP_cert"] = get_or_set_secret(
+            "shibIDP_cert",
+            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+        )
+
+    with open("/etc/certs/shibIDP.key") as f:
+        ctx["secret"]["shibIDP_key"] = get_or_set_secret(
+            "shibIDP_key",
+            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+        )
+
+    with open(ctx["config"]["shibJksFn"]) as f:
+        ctx["secret"]["shibIDP_jks_base64"] = get_or_set_secret(
+            "shibIDP_jks_base64",
+            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+        )
+
+    ctx["config"]["shibboleth_version"] = get_or_set_config("shibboleth_version", "v3")
+
+    ctx["config"]["idp3Folder"] = get_or_set_config("idp3Folder", "/opt/shibboleth-idp")
+
+    idp3_signing_cert = "/etc/certs/idp-signing.crt"
+
+    idp3_signing_key = "/etc/certs/idp-signing.key"
+
+    generate_ssl_certkey(
+        "idp-signing",
+        ctx["secret"]["shibJksPass"],
+        ctx["config"]["admin_email"],
+        ctx["config"]["hostname"],
+        ctx["config"]["orgName"],
+        ctx["config"]["country_code"],
+        ctx["config"]["state"],
+        ctx["config"]["city"],
+    )
+
+    with open(idp3_signing_cert) as f:
+        ctx["secret"]["idp3SigningCertificateText"] = get_or_set_secret(
+            "idp3SigningCertificateText", f.read())
+
+    with open(idp3_signing_key) as f:
+        ctx["secret"]["idp3SigningKeyText"] = get_or_set_secret(
+            "idp3SigningKeyText", f.read())
+
+    idp3_encryption_cert = "/etc/certs/idp-encryption.crt"
+
+    idp3_encryption_key = "/etc/certs/idp-encryption.key"
+
+    generate_ssl_certkey(
+        "idp-encryption",
+        ctx["secret"]["shibJksPass"],
+        ctx["config"]["admin_email"],
+        ctx["config"]["hostname"],
+        ctx["config"]["orgName"],
+        ctx["config"]["country_code"],
+        ctx["config"]["state"],
+        ctx["config"]["city"],
+    )
+
+    with open(idp3_encryption_cert) as f:
+        ctx["secret"]["idp3EncryptionCertificateText"] = get_or_set_secret(
+            "idp3EncryptionCertificateText", f.read())
+
+    with open(idp3_encryption_key) as f:
+        ctx["secret"]["idp3EncryptionKeyText"] = get_or_set_secret(
+            "idp3EncryptionKeyText", f.read())
+
+    gen_idp3_key(ctx["secret"]["shibJksPass"])
+
+    with open("/etc/certs/sealer.jks") as f:
+        ctx["secret"]["sealer_jks_base64"] = get_or_set_secret(
+            "sealer_jks_base64",
+            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+        )
 
     # populated config
     return ctx
@@ -773,21 +823,21 @@ def generate_ssl_certkey(suffix, passwd, email, domain, org_name,
            "/etc/certs/{}.key".format(suffix)
 
 
-# def get_extension_config(basedir="/opt/config-init/static/extension"):
-#     ctx = {}
-#     for ext_type in os.listdir(basedir):
-#         ext_type_dir = os.path.join(basedir, ext_type)
+def get_extension_config(basedir="/opt/config-init/static/extension"):
+    ctx = {}
+    for ext_type in os.listdir(basedir):
+        ext_type_dir = os.path.join(basedir, ext_type)
 
-#         for fname in os.listdir(ext_type_dir):
-#             filepath = os.path.join(ext_type_dir, fname)
-#             ext_name = "{}_{}".format(ext_type, os.path.splitext(fname)[0].lower())
+        for fname in os.listdir(ext_type_dir):
+            filepath = os.path.join(ext_type_dir, fname)
+            ext_name = "{}_{}".format(ext_type, os.path.splitext(fname)[0].lower())
 
-#             with open(filepath) as fd:
-#                 ctx[ext_name] = get_or_set(
-#                     ext_name,
-#                     generate_base64_contents(fd.read())
-#                 )
-#     return ctx
+            with open(filepath) as fd:
+                ctx[ext_name] = get_or_set_config(
+                    ext_name,
+                    generate_base64_contents(fd.read())
+                )
+    return ctx
 
 
 def validate_country_code(ctx, param, value):
@@ -865,80 +915,83 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city,
                        state, city, ldap_type, base_inum, inum_org,
                        inum_appliance)
 
-    from pprint import pprint
-    pprint(ctx)
-    # click.echo("Saving config.")
-    # for k, v in ctx.iteritems():
-    #     manager.config.set(k, v)
-    # click.echo("Config saved to backend")
+    _wrapper = namedtuple("Wrapper", "ctx type filepath")
+    wrappers = [
+        _wrapper(ctx=manager.config, type=CTX_CONFIG, filepath=CONFIG_FILEPATH),
+        _wrapper(ctx=manager.secret, type=CTX_SECRET, filepath=SECRET_FILEPATH),
+    ]
 
-    # ctx = {"_config": ctx}
-    # ctx = json.dumps(ctx, indent=4)
-    # with open(CONFIG_FILEPATH, "w") as f:
-    #     f.write(ctx)
-    #     click.echo("Config saved to {}".format(CONFIG_FILEPATH))
+    for wrapper in wrappers:
+        click.echo("Saving {} to backend.".format(wrapper.type))
+        for k, v in ctx[wrapper.type].iteritems():
+            wrapper.ctx.set(k, v)
 
+        click.echo("Saving {} to {}.".format(wrapper.type, wrapper.filepath))
+        data = {"_{}".format(wrapper.type): ctx[wrapper.type]}
+        data = json.dumps(data, indent=4)
 
-# @cli.command()
-# @click.option()
-# def load():
-#     """Loads config and secret from JSON file and save them into KV.
-#     """
-#     _wrapper = namedtuple("Wrapper", "ctx type filepath")
-#     wrappers = [
-#         _wrapper(ctx=manager.config, type=CTX_CONFIG, filepath=CONFIG_FILEPATH),
-#         _wrapper(ctx=manager.secret, type=CTX_SECRET, filepath=SECRET_FILEPATH),
-#     ]
-
-#     for wrapper in wrappers:
-#         click.echo("Loading {} from {}.".format(wrapper.type, wrapper.filepath))
-#         with open(wrapper.filepath, "r") as f:
-#             ctx = json.loads(f.read())
-
-#         if "_{}".format(wrapper.type) not in ctx:
-#             click.echo("Missing '_{}' key.".format(wrapper.type))
-#             return
-
-#         # tolerancy before checking existing key
-#         time.sleep(5)
-#         for k, v in ctx["_{}".format(wrapper.type)].iteritems():
-#             v = get_or_set(k, v)
-#             wrapper.ctx.set(k, v)
+        with open(wrapper.filepath, "w") as f:
+            f.write(data)
 
 
-# @cli.command()
-# @click.option()
-# def dump():
-#     """Dumps config and secret from KV and save them into JSON file.
-#     """
-#     _wrapper = namedtuple("Wrapper", "ctx type filepath")
-#     wrappers = [
-#         _wrapper(ctx=manager.config, type=CTX_CONFIG, filepath=CONFIG_FILEPATH),
-#         _wrapper(ctx=manager.secret, type=CTX_SECRET, filepath=SECRET_FILEPATH),
-#     ]
+@cli.command()
+def load():
+    """Loads config and secret from JSON file and save them into KV.
+    """
+    _wrapper = namedtuple("Wrapper", "ctx type filepath")
+    wrappers = [
+        _wrapper(ctx=manager.config, type=CTX_CONFIG, filepath=CONFIG_FILEPATH),
+        _wrapper(ctx=manager.secret, type=CTX_SECRET, filepath=SECRET_FILEPATH),
+    ]
 
-#     for wrapper in wrappers:
-#         click.echo("Dumping {} to {}.".format(wrapper.type, wrapper.filepath))
-#         ctx = {"_{}".format(wrapper.type): wrapper.ctx.all()}
-#         ctx = json.dumps(ctx, indent=4)
-#         with open(wrapper.filepath, "w") as f:
-#             f.write(ctx)
+    for wrapper in wrappers:
+        click.echo("Loading {} from {}.".format(wrapper.type, wrapper.filepath))
+        with open(wrapper.filepath, "r") as f:
+            data = json.loads(f.read())
+
+        if "_{}".format(wrapper.type) not in data:
+            click.echo("Missing '_{}' key.".format(wrapper.type))
+            return
+
+        # tolerancy before checking existing key
+        time.sleep(5)
+        for k, v in data["_{}".format(wrapper.type)].iteritems():
+            v = _get_or_set(k, v, wrapper.ctx)
+            wrapper.ctx.set(k, v)
+
+
+@cli.command()
+def dump():
+    """Dumps config and secret from KV and save them into JSON file.
+    """
+    _wrapper = namedtuple("Wrapper", "ctx type filepath")
+    wrappers = [
+        _wrapper(ctx=manager.config, type=CTX_CONFIG, filepath=CONFIG_FILEPATH),
+        _wrapper(ctx=manager.secret, type=CTX_SECRET, filepath=SECRET_FILEPATH),
+    ]
+
+    for wrapper in wrappers:
+        click.echo("Dumping {} to {}.".format(wrapper.type, wrapper.filepath))
+        data = {"_{}".format(wrapper.type): wrapper.ctx.all()}
+        data = json.dumps(data, indent=4)
+        with open(wrapper.filepath, "w") as f:
+            f.write(data)
 
 
 def _get_or_set(key, value, ctx_manager):
     overwrite_all = as_boolean(os.environ.get("GLUU_OVERWRITE_ALL", False))
     if overwrite_all:
         click.echo("  updating key {!r}".format(key))
-        ctx_manager.set(key, value)
+        # ctx_manager.set(key, value)
         return value
 
     # check existing value first
     _value = ctx_manager.get(key)
     if _value:
-        click.echo("  ignoring existing key {!r}".format(key))
+        click.echo("  reading existing key {!r}".format(key))
         return _value
 
-    click.echo("  adding new key {!r}".format(key))
+    click.echo("  creating new key {!r}".format(key))
     return value
 
 

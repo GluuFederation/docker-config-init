@@ -413,7 +413,9 @@ class VaultSecret(BaseSecret):
     def _authenticate(self):
         if self.client.is_authenticated():
             return
-        self.client.auth_approle(self.role_id, self.secret_id)
+
+        creds = self.client.auth_approle(self.role_id, self.secret_id, use_token=False)
+        self.client.token = creds["auth"]["client_token"]
 
     def get(self, key, default=None):
         self._authenticate()
@@ -426,6 +428,11 @@ class VaultSecret(BaseSecret):
         self._authenticate()
         val = {"value": value}
         self.client.write("{}/{}".format(self.prefix, key), **val)
+
+    def all(self):
+        self._authenticate()
+        result = self.client.list(self.prefix)
+        return {key: self.get(key) for key in result["data"]["keys"]}
 
 
 class KubernetesSecret(BaseSecret):
@@ -534,8 +541,6 @@ class SecretManager(object):
         if not sc and self.config_adapter:
             # tries to get from old config
             sc = self.config_adapter.get(key, default)
-            # migrate to secret adapter
-            self.adapter.set(key, sc)
 
         if not sc:
             # fallback to default
