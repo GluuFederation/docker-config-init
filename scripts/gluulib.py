@@ -354,11 +354,11 @@ class VaultSecret(BaseSecret):
         )
         self.settings.setdefault(
             "GLUU_SECRET_VAULT_ROLE_ID_FILE",
-            "/run/secrets/vault_role_id",
+            "/etc/certs/vault_role_id",
         ),
         self.settings.setdefault(
             "GLUU_SECRET_VAULT_SECRET_ID_FILE",
-            "/run/secrets/vault_secret_id",
+            "/etc/certs/vault_secret_id",
         )
         self.settings.setdefault(
             "GLUU_SECRET_VAULT_CERT_FILE",
