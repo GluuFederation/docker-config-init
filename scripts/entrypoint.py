@@ -9,7 +9,6 @@ import string
 import subprocess
 import time
 import uuid
-from collections import namedtuple
 from functools import partial
 
 import click
@@ -24,8 +23,6 @@ _DEFAULT_CHARS = "".join([string.ascii_uppercase,
                           string.digits,
                           string.lowercase])
 
-CTX_CONFIG = "config"
-CTX_SECRET = "secret"
 CONFIG_FILEPATH = "/opt/config-init/db/config.json"
 SECRET_FILEPATH = "/opt/config-init/db/secret.json"
 
@@ -885,113 +882,20 @@ def gen_idp3_key(shibJksPass):
     return out, err, retcode
 
 
-@click.group()
-def cli():
-    pass
-
-
-@cli.command()
-@click.option("--admin-pw", required=True, help="Password for admin access.")
-@click.option("--email", required=True, help="Email for support.")
-@click.option("--domain", required=True, help="Domain for Gluu Server.")
-@click.option("--org-name", required=True, help="Organization name.")
-@click.option("--country-code", required=True, help="Country code.", callback=validate_country_code)
-@click.option("--state", required=True, help="State.")
-@click.option("--city", required=True, help="City.")
-@click.option("--ldap-type", default="opendj", type=click.Choice(["opendj", "openldap"]), help="LDAP choice")
-@click.option("--base-inum", default="", help="Base inum.", show_default=True)
-@click.option("--inum-org", default="", help="Organization inum.", show_default=True)
-@click.option("--inum-appliance", default="", help="Appliance inum.", show_default=True)
-def generate(admin_pw, email, domain, org_name, country_code, state, city,
-             ldap_type, base_inum, inum_org, inum_appliance):
-    """Generates initial config and secret and save them into KV.
-    """
-    wait_for(manager)
-
-    click.echo("Generating config and secret.")
-    # tolerancy before checking existing key
-    time.sleep(5)
-    ctx = generate_ctx(admin_pw, email, domain, org_name, country_code,
-                       state, city, ldap_type, base_inum, inum_org,
-                       inum_appliance)
-
-    _wrapper = namedtuple("Wrapper", "ctx type filepath")
-    wrappers = [
-        _wrapper(ctx=manager.config, type=CTX_CONFIG, filepath=CONFIG_FILEPATH),
-        _wrapper(ctx=manager.secret, type=CTX_SECRET, filepath=SECRET_FILEPATH),
-    ]
-
-    for wrapper in wrappers:
-        click.echo("Saving {} to backend.".format(wrapper.type))
-        for k, v in ctx[wrapper.type].iteritems():
-            wrapper.ctx.set(k, v)
-
-        click.echo("Saving {} to {}.".format(wrapper.type, wrapper.filepath))
-        data = {"_{}".format(wrapper.type): ctx[wrapper.type]}
-        data = json.dumps(data, indent=4)
-
-        with open(wrapper.filepath, "w") as f:
-            f.write(data)
-
-
-@cli.command()
-def load():
-    """Loads config and secret from JSON file and save them into KV.
-    """
-    _wrapper = namedtuple("Wrapper", "ctx type filepath")
-    wrappers = [
-        _wrapper(ctx=manager.config, type=CTX_CONFIG, filepath=CONFIG_FILEPATH),
-        _wrapper(ctx=manager.secret, type=CTX_SECRET, filepath=SECRET_FILEPATH),
-    ]
-
-    for wrapper in wrappers:
-        click.echo("Loading {} from {}.".format(wrapper.type, wrapper.filepath))
-        with open(wrapper.filepath, "r") as f:
-            data = json.loads(f.read())
-
-        if "_{}".format(wrapper.type) not in data:
-            click.echo("Missing '_{}' key.".format(wrapper.type))
-            return
-
-        # tolerancy before checking existing key
-        time.sleep(5)
-        for k, v in data["_{}".format(wrapper.type)].iteritems():
-            v = _get_or_set(k, v, wrapper.ctx)
-            wrapper.ctx.set(k, v)
-
-
-@cli.command()
-def dump():
-    """Dumps config and secret from KV and save them into JSON file.
-    """
-    _wrapper = namedtuple("Wrapper", "ctx type filepath")
-    wrappers = [
-        _wrapper(ctx=manager.config, type=CTX_CONFIG, filepath=CONFIG_FILEPATH),
-        _wrapper(ctx=manager.secret, type=CTX_SECRET, filepath=SECRET_FILEPATH),
-    ]
-
-    for wrapper in wrappers:
-        click.echo("Dumping {} to {}.".format(wrapper.type, wrapper.filepath))
-        data = {"_{}".format(wrapper.type): wrapper.ctx.all()}
-        data = json.dumps(data, indent=4)
-        with open(wrapper.filepath, "w") as f:
-            f.write(data)
-
-
 def _get_or_set(key, value, ctx_manager):
     overwrite_all = as_boolean(os.environ.get("GLUU_OVERWRITE_ALL", False))
     if overwrite_all:
-        click.echo("  updating key {!r}".format(key))
+        click.echo("  updating {} {!r}".format(ctx_manager.adapter.type, key))
         # ctx_manager.set(key, value)
         return value
 
     # check existing value first
     _value = ctx_manager.get(key)
     if _value:
-        click.echo("  reading existing key {!r}".format(key))
+        click.echo("  ignoring {} {!r}".format(ctx_manager.adapter.type, key))
         return _value
 
-    click.echo("  creating new key {!r}".format(key))
+    click.echo("  adding {} {!r}".format(ctx_manager.adapter.type, key))
     return value
 
 
@@ -1035,6 +939,112 @@ def as_boolean(val, default=False):
     if val in falsy:
         return False
     return default
+
+
+# ============
+# CLI commands
+# ============
+
+
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+@click.option("--admin-pw", required=True, help="Password for admin access.")
+@click.option("--email", required=True, help="Email for support.")
+@click.option("--domain", required=True, help="Domain for Gluu Server.")
+@click.option("--org-name", required=True, help="Organization name.")
+@click.option("--country-code", required=True, help="Country code.", callback=validate_country_code)
+@click.option("--state", required=True, help="State.")
+@click.option("--city", required=True, help="City.")
+@click.option("--ldap-type", default="opendj", type=click.Choice(["opendj", "openldap"]), help="LDAP choice")
+@click.option("--base-inum", default="", help="Base inum.", show_default=True)
+@click.option("--inum-org", default="", help="Organization inum.", show_default=True)
+@click.option("--inum-appliance", default="", help="Appliance inum.", show_default=True)
+def generate(admin_pw, email, domain, org_name, country_code, state, city,
+             ldap_type, base_inum, inum_org, inum_appliance):
+    """Generates initial config and secret and save them into KV.
+    """
+    def _save_generated_ctx(ctx_manager, filepath, data):
+        click.echo("Saving {} to backend.".format(ctx_manager.adapter.type))
+
+        for k, v in data.iteritems():
+            ctx_manager.set(k, v)
+
+        click.echo("Saving {} to {}.".format(ctx_manager.adapter.type, filepath))
+        data = {"_{}".format(ctx_manager.adapter.type): data}
+        data = json.dumps(data, indent=4)
+
+        with open(filepath, "w") as f:
+            f.write(data)
+
+    wait_for(manager)
+
+    click.echo("Generating config and secret.")
+    # tolerancy before checking existing key
+    time.sleep(5)
+    ctx = generate_ctx(admin_pw, email, domain, org_name, country_code,
+                       state, city, ldap_type, base_inum, inum_org,
+                       inum_appliance)
+
+    wrappers = [
+        (manager.config, CONFIG_FILEPATH),
+        (manager.secret, SECRET_FILEPATH),
+    ]
+    for wrapper in wrappers:
+        _save_generated_ctx(wrapper[0], wrapper[1], ctx[wrapper[0].adapter.type])
+
+
+@cli.command()
+def load():
+    """Loads config and secret from JSON file and save them into KV.
+    """
+    def _load_from_file(ctx_manager, filepath):
+        click.echo("Loading {} from {}.".format(
+            ctx_manager.adapter.type, filepath))
+
+        with open(filepath, "r") as f:
+            data = json.loads(f.read())
+
+        if "_{}".format(ctx_manager.adapter.type) not in data:
+            click.echo("Missing '_{}' key.".format(ctx_manager.adapter.type))
+            return
+
+        # tolerancy before checking existing key
+        time.sleep(5)
+        for k, v in data["_{}".format(ctx_manager.adapter.type)].iteritems():
+            v = _get_or_set(k, v, ctx_manager)
+            ctx_manager.set(k, v)
+
+    wrappers = [
+        (manager.config, CONFIG_FILEPATH),
+        (manager.secret, SECRET_FILEPATH),
+    ]
+    for wrapper in wrappers:
+        _load_from_file(wrapper[0], wrapper[1])
+
+
+@cli.command()
+def dump():
+    """Dumps config and secret from KV and save them into JSON file.
+    """
+    def _dump_to_file(ctx_manager, filepath):
+        click.echo("Saving {} to {}.".format(
+            ctx_manager.adapter.type, filepath))
+
+        data = {"_{}".format(ctx_manager.adapter.type): ctx_manager.all()}
+        data = json.dumps(data, indent=4)
+        with open(filepath, "w") as f:
+            f.write(data)
+
+    wrappers = [
+        (manager.config, CONFIG_FILEPATH),
+        (manager.secret, SECRET_FILEPATH),
+    ]
+    for wrapper in wrappers:
+        _dump_to_file(wrapper[0], wrapper[1])
 
 
 if __name__ == "__main__":
