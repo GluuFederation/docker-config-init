@@ -85,17 +85,17 @@ COPY static /opt/config-init/static
 RUN mkdir -p /etc/certs /opt/config-init/db
 RUN chmod +x /opt/config-init/scripts/entrypoint.sh
 
-# create gluu user
-RUN useradd -ms /bin/sh --uid 1000 gluu \
-    && usermod -a -G root gluu
+# # create gluu user
+# RUN useradd -ms /bin/sh --uid 1000 gluu \
+#     && usermod -a -G root gluu
 
-# adjust ownership
-RUN chown -R 1000:1000 /opt/config-init \
-    && chgrp -R 0 /opt/config-init && chmod -R g=u /opt/config-init \
-    && chgrp -R 0 /etc/certs && chmod -R g=u /etc/certs
+# # adjust ownership
+# RUN chown -R 1000:1000 /opt/config-init \
+#     && chgrp -R 0 /opt/config-init && chmod -R g=u /opt/config-init \
+#     && chgrp -R 0 /etc/certs && chmod -R g=u /etc/certs
 
-# run the entrypoint as gluu user
-USER 1000
+# # run the entrypoint as gluu user
+# USER 1000
 
 ENTRYPOINT ["tini", "-g", "--", "/opt/config-init/scripts/entrypoint.sh"]
 CMD ["--help"]
