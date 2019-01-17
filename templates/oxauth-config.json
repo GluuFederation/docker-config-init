@@ -1,7 +1,5 @@
 {
     "issuer":"https://%(hostname)s",
-    "loginPage":"https://%(hostname)s/oxauth/login.htm",
-    "authorizationPage":"https://%(hostname)s/oxauth/authorize.htm",
     "baseEndpoint":"https://%(hostname)s/oxauth/restv1",
     "authorizationEndpoint":"https://%(hostname)s/oxauth/restv1/authorize",
     "tokenEndpoint":"https://%(hostname)s/oxauth/restv1/token",
@@ -165,6 +163,7 @@
     "requestParameterSupported":true,
     "requestUriParameterSupported":true,
     "requireRequestUriRegistration":false,
+    "allowPostLogoutRedirectWithoutValidation":false,
     "introspectionAccessTokenMustHaveUmaProtectionScope":false,
     "opPolicyUri":"http://ox.gluu.org/doku.php?id=oxauth:policy",
     "opTosUri":"http://ox.gluu.org/doku.php?id=oxauth:tos",
@@ -191,7 +190,7 @@
     "organizationInum":"%(inumOrg)s",
     "oxId":"https://%(hostname)s/oxid/service/gluu/inum",
     "dynamicRegistrationEnabled":true,
-    "dynamicRegistrationExpirationTime":86400,
+    "dynamicRegistrationExpirationTime":-1,
     "dynamicRegistrationPersistClientAuthorizations":true,
     "trustedClientEnabled":true,
     "skipAuthorizationForOpenIdScopeAndPairwiseId": false,
@@ -204,6 +203,7 @@
     "persistIdTokenInLdap":false,
     "persistRefreshTokenInLdap":true,
     "authenticationFiltersEnabled":false,
+    "invalidateSessionCookiesAfterAuthorizationFlow":false,
     "clientAuthenticationFiltersEnabled":false,
     "authenticationFilters":[
         {
@@ -287,5 +287,17 @@
 		"maximumAllowedAttemptsWithoutDelay": 4,
 		"delayTime": 2,
 		"bruteForceProtectionEnabled": false
-	}    
+	},
+	"fido2Configuration":{
+		"authenticatorCertsFolder":"%(fido2ConfigFolder)s/authenticator_cert",
+		"mdsCertsFolder":"%(fido2ConfigFolder)s/mds/cert",
+		"mdsTocsFolder":"%(fido2ConfigFolder)s/mds/toc",
+		"serverMetadataFolder":"%(fido2ConfigFolder)s/server_metadata",
+		"userAutoEnrollment":false,
+		"unfinishedRequestExpiration":120,
+		"authenticationHistoryExpiration":1296000,
+		"disableFido2":true
+	},
+   "loggingLevel": "INFO",
+   "errorHandlingMethod":"internal"
 }

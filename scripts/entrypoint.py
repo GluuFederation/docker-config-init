@@ -209,6 +209,8 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
 
     ctx["config"]["jetty_base"] = get_or_set_config("jetty_base", "/opt/gluu/jetty")
 
+    ctx["config"]["fido2ConfigFolder"] = get_or_set_config("fido2ConfigFolder", "/etc/gluu/conf/fido2")
+
     # ====
     # LDAP
     # ====
@@ -477,6 +479,11 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
             "scim_rp_jks_base64",
             encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
         )
+
+    ctx["config"]["scim_resource_oxid"] = get_or_set_config(
+        "scim_resource_oxid",
+        str(uuid.uuid4()),
+    )
 
     # ===========
     # Passport RS
