@@ -5,6 +5,7 @@ LABEL maintainer="Gluu Inc. <support@gluu.org>"
 # ===============
 # Alpine packages
 # ===============
+
 RUN apk update && apk add --no-cache \
     openssl \
     py-pip \
@@ -44,6 +45,7 @@ RUN pip install --no-cache-dir -U pip \
 # ==========
 # Config ENV
 # ==========
+
 ENV GLUU_CONFIG_ADAPTER consul
 ENV GLUU_CONFIG_CONSUL_HOST localhost
 ENV GLUU_CONFIG_CONSUL_PORT 8500
@@ -62,6 +64,7 @@ ENV GLUU_CONFIG_KUBERNETES_USE_KUBE_CONFIG false
 # ==========
 # Secret ENV
 # ==========
+
 ENV GLUU_SECRET_ADAPTER vault
 ENV GLUU_SECRET_VAULT_SCHEME http
 ENV GLUU_SECRET_VAULT_HOST localhost
@@ -75,6 +78,14 @@ ENV GLUU_SECRET_VAULT_CACERT_FILE /etc/certs/vault_ca.crt
 ENV GLUU_SECRET_KUBERNETES_NAMESPACE default
 ENV GLUU_SECRET_KUBERNETES_SECRET gluu
 ENV GLUU_SECRET_KUBERNETES_USE_KUBE_CONFIG false
+
+# ===========
+# Generic ENV
+# ===========
+
+ENV GLUU_OVERWRITE_ALL false
+ENV GLUU_WAIT_MAX_TIME 300
+ENV GLUU_WAIT_SLEEP_DURATION 5
 
 # ====
 # misc
