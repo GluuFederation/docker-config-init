@@ -4,4 +4,4 @@ A docker image to generate the necessary configuration required by other docker 
 
 ## Documentation
 
-The official documentation can be found at https://gluu.org/docs/ce/3.1.4/docker/intro/.
+The official documentation can be found at https://gluu.org/docs/de/3.1.5.
