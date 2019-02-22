@@ -42,6 +42,13 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir -r requirements.txt
 
+# =======
+# License
+# =======
+
+RUN mkdir -p /licenses
+COPY LICENSE /licenses/
+
 # ==========
 # Config ENV
 # ==========
