@@ -76,6 +76,10 @@ class PersonAuthentication(PersonAuthenticationType):
     def authenticate(self, configurationAttributes, requestParameters, step):
         userService = CdiUtil.bean(UserService)
         authenticationService = CdiUtil.bean(AuthenticationService)
+
+        facesMessages = CdiUtil.bean(FacesMessages)
+        facesMessages.setKeepMessages()
+
         session_attributes = self.identity.getSessionId().getSessionAttributes()
         form_passcode = ServerUtil.getFirstValue(requestParameters, "passcode")
         form_name = ServerUtil.getFirstValue(requestParameters, "TwilioSmsloginForm")
@@ -116,6 +120,7 @@ class PersonAuthentication(PersonAuthenticationType):
                     print "TwilioSMS, Error finding mobile number for user '%'" % user_name    
                     
             except:
+                facesMessages.add(FacesMessage.SEVERITY_ERROR, "Failed to determine mobile phone number")
                 print 'TwilioSMS, Error finding mobile number for' % (user_name)
                 return False
 
@@ -142,14 +147,12 @@ class PersonAuthentication(PersonAuthenticationType):
                 print "++++++++++++++++++++++++++++++++++++++++++++++"
                 return True
             except Exception, ex:
+                facesMessages.add(FacesMessage.SEVERITY_ERROR, "Failed to send message to mobile phone")
                 print "TwilioSMS. Error sending message to Twilio"
                 print "TwilioSMS. Unexpected error:", ex
 
             return False
         elif step == 2:
-
-            facesMessages = CdiUtil.bean(FacesMessages)
-            facesMessages.setKeepMessages()
             # Retrieve the session attribute
             print "TwilioSMS. Step 2 SMS/OTP Authentication"
             code = session_attributes.get("code")
