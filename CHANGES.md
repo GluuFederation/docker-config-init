@@ -2,6 +2,12 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.1.5_02
+
+Released on March 28th, 2019.
+
+* Added `wait_for` in `load` and `dump` commands.
+
 ## Version 3.1.5_01
 
 Released on March 23rd, 2019.
