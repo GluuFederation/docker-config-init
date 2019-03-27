@@ -1025,6 +1025,8 @@ def load():
             v = _get_or_set(k, v, ctx_manager)
             ctx_manager.set(k, v)
 
+    wait_for(manager)
+
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
         (manager.secret, SECRET_FILEPATH),
@@ -1045,6 +1047,8 @@ def dump():
         data = json.dumps(data, indent=4)
         with open(filepath, "w") as f:
             f.write(data)
+
+    wait_for(manager)
 
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
