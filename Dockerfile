@@ -31,6 +31,13 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir -r requirements.txt
 
+# =======
+# License
+# =======
+
+RUN mkdir -p /licenses
+COPY LICENSE /licenses/
+
 ENV GLUU_CONFIG_ADAPTER consul
 ENV GLUU_CONSUL_HOST localhost
 ENV GLUU_CONSUL_PORT 8500
@@ -44,6 +51,7 @@ ENV GLUU_CONSUL_KEY_FILE /etc/certs/consul_client.key
 ENV GLUU_CONSUL_TOKEN_FILE /etc/certs/consul_token
 ENV GLUU_KUBERNETES_NAMESPACE default
 ENV GLUU_KUBERNETES_CONFIGMAP gluu
+ENV GLUU_AUTO_ACCEPT_LICENSE false
 
 # ====
 # misc
@@ -53,6 +61,7 @@ COPY templates ./templates
 COPY static ./static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
+RUN chmod +x ./scripts/license_checker.py
 
-ENTRYPOINT ["python", "./scripts/entrypoint.py"]
+ENTRYPOINT ["/opt/config-init/scripts/license_checker.py", "python", "/opt/config-init/scripts/entrypoint.py"]
 CMD ["--help"]
