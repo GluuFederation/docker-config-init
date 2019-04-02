@@ -23,19 +23,24 @@ def execute_passed_command(command_list):
 def main():
     if not os.path.isfile("/license_ack"):
         # license prompt
-        GLUU_AUTO_ACCEPT_LICENSE = os.environ.get("GLUU_AUTO_ACCEPT_LICENSE", False)
+        GLUU_AUTO_ACK_LICENSE = os.environ.get("GLUU_AUTO_ACK_LICENSE", False)
 
-        if not as_boolean(GLUU_AUTO_ACCEPT_LICENSE):
+        if not as_boolean(GLUU_AUTO_ACK_LICENSE):
             click.echo("Gluu License Agreement: https://github.com/GluuFederation/gluu-docker/blob/3.1.4/LICENSE")
-            click.echo("")
 
-            if not click.confirm("Do you acknowledge that use of Gluu Server Docker Edition is subject to the Gluu Support License"):
+            try:
+                if not click.confirm("Do you acknowledge that use of Gluu Server Docker Edition is subject to the Gluu Support License"):
+                    click.echo("Error: unable to proceed without license acknowledgement ... exiting")
+                    sys.exit(1)
+            except click.exceptions.Abort:
+                click.echo("")
+                click.echo("Error: unable to proceed without an interactive process ... exiting")
                 sys.exit(1)
-
-            click.echo("")
-            # create a flag
-            with open("/license_ack", "w") as fw:
-                fw.write("")
+            else:
+                click.echo("")
+                # create a flag
+                with open("/license_ack", "w") as fw:
+                    fw.write("")
 
     # execute next command
     execute_passed_command(sys.argv[1:])
