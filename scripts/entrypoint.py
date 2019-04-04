@@ -26,6 +26,14 @@ _DEFAULT_CHARS = "".join([string.ascii_uppercase,
                           string.digits,
                           string.lowercase])
 
+LICENSE_ACK = """
+# ========================================================================================= #
+# Gluu License Agreement: https://github.com/GluuFederation/gluu-docker/blob/3.1.4/LICENSE. #
+# The use of Gluu Server Docker Edition is subject to the Gluu Support License.             #
+# ========================================================================================= #
+
+"""
+
 config_manager = ConfigManager()
 
 
@@ -963,4 +971,5 @@ def as_boolean(val, default=False):
 
 
 if __name__ == "__main__":
+    print LICENSE_ACK
     cli()

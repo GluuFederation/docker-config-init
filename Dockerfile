@@ -51,7 +51,6 @@ ENV GLUU_CONSUL_KEY_FILE /etc/certs/consul_client.key
 ENV GLUU_CONSUL_TOKEN_FILE /etc/certs/consul_token
 ENV GLUU_KUBERNETES_NAMESPACE default
 ENV GLUU_KUBERNETES_CONFIGMAP gluu
-ENV GLUU_AUTO_ACK_LICENSE false
 
 # ====
 # misc
@@ -61,7 +60,6 @@ COPY templates ./templates
 COPY static ./static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
-RUN chmod +x ./scripts/license_checker.py
 
-ENTRYPOINT ["/opt/config-init/scripts/license_checker.py", "python", "/opt/config-init/scripts/entrypoint.py"]
+ENTRYPOINT ["python", "/opt/config-init/scripts/entrypoint.py"]
 CMD ["--help"]
