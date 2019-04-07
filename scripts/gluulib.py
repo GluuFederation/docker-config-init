@@ -57,6 +57,13 @@ class BaseConfig(object):
         """
         raise NotImplementedError
 
+    def delete(self, key):
+        """Deletes specific config.
+
+        Subclass __MUST__ implement this method.
+        """
+        raise NotImplementedError
+
     def all(self):
         """Get all config as ``dict`` type.
 
@@ -200,6 +207,9 @@ class ConsulConfig(BaseConfig):
     def all(self):
         return self.find("")
 
+    def delete(self, key):
+        return self.client.kv.delete(self._merge_path(key))
+
     def _request_warning(self, scheme, verify):
         if scheme == "https" and verify is False:
             import urllib3
@@ -297,6 +307,23 @@ class KubernetesConfig(BaseConfig):
             self.settings["GLUU_CONFIG_KUBERNETES_NAMESPACE"])
         return result.data or {}
 
+    def delete(self, key):
+        result = self.all()
+        result.pop(key, None)
+
+        body = {
+            "kind": "ConfigMap",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": self.settings["GLUU_CONFIG_KUBERNETES_CONFIGMAP"],
+            },
+            "data": result,
+        }
+        return self.client.replace_namespaced_config_map(
+            self.settings["GLUU_CONFIG_KUBERNETES_CONFIGMAP"],
+            self.settings["GLUU_CONFIG_KUBERNETES_NAMESPACE"],
+            body=body)
+
 
 class ConfigManager(object):
     def __init__(self):
@@ -319,6 +346,9 @@ class ConfigManager(object):
 
     def all(self):
         return self.adapter.all()
+
+    def delete(self, key):
+        return self.adapter.delete(key)
 
 
 class BaseSecret(object):

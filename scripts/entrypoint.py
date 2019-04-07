@@ -966,7 +966,7 @@ def cli():
 @click.option("--country-code", required=True, help="Country code.", callback=validate_country_code)
 @click.option("--state", required=True, help="State.")
 @click.option("--city", required=True, help="City.")
-@click.option("--ldap-type", default="opendj", type=click.Choice(["opendj", "openldap"]), help="LDAP choice")
+@click.option("--ldap-type", default="opendj", type=click.Choice(["opendj"]), help="LDAP choice")
 @click.option("--base-inum", default="", help="Base inum.", show_default=True)
 @click.option("--inum-org", default="", help="Organization inum.", show_default=True)
 @click.option("--inum-appliance", default="", help="Appliance inum.", show_default=True)
@@ -1056,6 +1056,85 @@ def dump():
     ]
     for wrapper in wrappers:
         _dump_to_file(wrapper[0], wrapper[1])
+
+
+@cli.command()
+@click.option("--overwrite", default=False, help="Overwrite secret keys.", is_flag=True)
+@click.option("--prune", default=False, help="Prune migrated keys.", is_flag=True)
+def migrate(overwrite, prune):
+    """Migrates keys from config to secret backend.
+    """
+    SECRET_KEYS = (
+        'encoded_salt',
+        'pairwiseCalculationKey',
+        'pairwiseCalculationSalt',
+        'ldap_truststore_pass',
+        'ldap_ssl_cert',
+        'ldap_ssl_key',
+        'ldap_ssl_cacert',
+        'ldap_pkcs12_base64',
+        'encoded_ldapTrustStorePass',
+        'encoded_ldap_pw',
+        'encoded_ox_ldap_pw',
+        'encoded_replication_pw',
+        'encoded_ox_replication_pw',
+        'oxauthClient_encoded_pw',
+        'oxauth_openid_jks_pass',
+        'oxauth_config_base64',
+        'oxauth_openid_key_base64',
+        'scim_rs_client_jks_pass',
+        'scim_rs_client_jks_pass_encoded',
+        'scim_rs_client_base64_jwks',
+        'scim_rs_jks_base64',
+        'scim_rp_client_jks_pass',
+        'scim_rp_client_jks_pass_encoded',
+        'scim_rp_client_base64_jwks',
+        'scim_rp_jks_base64',
+        'passport_rs_client_jks_pass',
+        'passport_rs_client_jks_pass_encoded',
+        'passport_rs_client_base64_jwks',
+        'passport_rs_jks_base64',
+        'passport_rp_client_jks_pass',
+        'passport_rp_client_base64_jwks',
+        'passport_rp_jks_base64',
+        'passport_rp_client_cert_base64',
+        'passportSpKeyPass',
+        'passportSpJksPass',
+        'passport_sp_cert_base64',
+        'passport_sp_key_base64',
+        'oxasimba_config_base64',
+        'ssl_cert',
+        'ssl_key',
+        'idpClient_encoded_pw',
+        'oxidp_config_base64',
+        'shibJksPass',
+        'encoded_shib_jks_pw',
+        'shibIDP_cert',
+        'shibIDP_key',
+        'shibIDP_jks_base64',
+        'idp3SigningCertificateText',
+        'idp3SigningKeyText',
+        'idp3EncryptionCertificateText',
+        'idp3EncryptionKeyText',
+        'sealer_jks_base64',
+    )
+
+    wait_for(manager)
+
+    for k, v in manager.config.all().iteritems():
+        if k not in SECRET_KEYS or not v:
+            continue
+
+        # if key must be overwritten or not available in secret backend;
+        # then migrate it
+        if overwrite or not manager.secret.get(k):
+            click.echo("migrating {} from config to secret backend".format(k))
+            manager.secret.set(k, v)
+
+        # if key must be removed from config and has been migrated, delete it
+        if prune and manager.secret.get(k):
+            click.echo("deleting {} from config".format(k))
+            manager.config.delete(k)
 
 
 if __name__ == "__main__":
