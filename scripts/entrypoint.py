@@ -1121,18 +1121,27 @@ def migrate(overwrite, prune):
 
     wait_for(manager)
 
+    if overwrite:
+        click.echo("overwrite mode is enabled")
+
+    if prune:
+        click.echo("prune mode is enabled")
+
     for k, v in manager.config.all().iteritems():
         if k not in SECRET_KEYS or not v:
             continue
 
-        # if key must be overwritten or not available in secret backend;
-        # then migrate it
-        if overwrite or not manager.secret.get(k):
+        # if key must be overwritten or not available in secret backend,
+        # then migrate it; note that to check whether key is actually
+        # in secret backend, we need to use low-level API
+        # (using `secret.adapter.get` instead of `secret.get`)
+        if overwrite or not manager.secret.adapter.get(k):
             click.echo("migrating {} from config to secret backend".format(k))
             manager.secret.set(k, v)
 
-        # if key must be removed from config and has been migrated, delete it
-        if prune and manager.secret.get(k):
+        # if key must be removed from config, then delete it
+        # (only if it has been migrated)
+        if prune and manager.secret.adapter.get(k):
             click.echo("deleting {} from config".format(k))
             manager.config.delete(k)
 
