@@ -2,6 +2,13 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.1.5_03
+
+Released on April 9th, 2019.
+
+* Added license info on container startup.
+* Added new command `migrate` to migrate some keys from config to secret backend.
+
 ## Version 3.1.5_02
 
 Released on March 28th, 2019.
