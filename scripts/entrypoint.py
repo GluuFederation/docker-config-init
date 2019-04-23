@@ -23,6 +23,9 @@ _DEFAULT_CHARS = "".join([string.ascii_uppercase,
                           string.digits,
                           string.lowercase])
 
+SIG_KEYS = "RS256 RS384 RS512 ES256 ES384 ES512"
+ENC_KEYS = "RSA_OAEP RSA1_5"
+
 CONFIG_FILEPATH = "/opt/config-init/db/config.json"
 SECRET_FILEPATH = "/opt/config-init/db/secret.json"
 
@@ -114,8 +117,7 @@ def exec_cmd(cmd):
     return stdout, stderr, retcode
 
 
-def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365,
-                         alg="RS256 RS384 RS512 ES256 ES384 ES512"):
+def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
     if os.path.exists(jks_path):
         os.unlink(jks_path)
 
@@ -125,8 +127,8 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365,
     cmd = " ".join([
         "java",
         "-jar", "/opt/config-init/javalibs/oxauth-client.jar",
-        "-enc_keys", alg,
-        "-sig_keys", alg,
+        "-enc_keys", ENC_KEYS,
+        "-sig_keys", SIG_KEYS,
         "-dnname", "{!r}".format(dn),
         "-expiration", "{}".format(exp),
         "-keystore", jks_path,
@@ -227,14 +229,9 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
 
     ctx["config"]["ldap_type"] = get_or_set_config("ldap_type", ldap_type)
 
-    if ctx["config"]["ldap_type"] == "opendj":
-        ldap_binddn = "cn=directory manager"
-        ldap_site_binddn = "cn=directory manager"
-        ldapTrustStoreFn = "/etc/certs/opendj.pkcs12"
-    else:
-        ldap_binddn = "cn=directory manager,o=gluu"
-        ldap_site_binddn = "cn=directory manager,o=site"
-        ldapTrustStoreFn = "/etc/certs/openldap.pkcs12"
+    ldap_binddn = "cn=directory manager"
+    ldap_site_binddn = "cn=directory manager"
+    ldapTrustStoreFn = "/etc/certs/opendj.pkcs12"
 
     ctx["config"]["ldap_binddn"] = get_or_set_config("ldap_binddn", ldap_binddn)
 
@@ -378,6 +375,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
         ctx["config"]["oxauth_openid_jks_fn"],
         ctx["config"]["oxauth_openid_jwks_fn"],
         ctx["config"]["default_openid_jks_dn_name"],
+        exp=2,
     )
 
     basedir, fn = os.path.split(ctx["config"]["oxauth_openid_jwks_fn"])

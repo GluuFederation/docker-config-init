@@ -2,6 +2,12 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 3.1.5_04
+
+Released on April 23rd, 2019.
+
+* Changed default expiration time for oxAuth keys.
+
 ## Version 3.1.5_03
 
 Released on April 9th, 2019.
