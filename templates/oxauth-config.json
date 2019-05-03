@@ -3,6 +3,7 @@
     "baseEndpoint":"https://%(hostname)s/oxauth/restv1",
     "authorizationEndpoint":"https://%(hostname)s/oxauth/restv1/authorize",
     "tokenEndpoint":"https://%(hostname)s/oxauth/restv1/token",
+    "tokenRevocationEndpoint": "https://%(hostname)s/oxauth/restv1/revoke",
     "userInfoEndpoint":"https://%(hostname)s/oxauth/restv1/userinfo",
     "clientInfoEndpoint":"https://%(hostname)s/oxauth/restv1/clientinfo",
     "checkSessionIFrame":"https://%(hostname)s/oxauth/opiframe.htm",
@@ -52,10 +53,7 @@
         "RS512",
         "ES256",
         "ES384",
-        "ES512",
-        "PS256",
-        "PS384",
-        "PS512"
+        "ES512"
     ],
     "userInfoEncryptionAlgValuesSupported":[
         "RSA1_5",
@@ -79,10 +77,7 @@
         "RS512",
         "ES256",
         "ES384",
-        "ES512",
-        "PS256",
-        "PS384",
-        "PS512"
+        "ES512"
     ],
     "idTokenEncryptionAlgValuesSupported":[
         "RSA1_5",
@@ -106,10 +101,7 @@
         "RS512",
         "ES256",
         "ES384",
-        "ES512",
-        "PS256",
-        "PS384",
-        "PS512"
+        "ES512"
     ],
     "requestObjectEncryptionAlgValuesSupported":[
         "RSA1_5",
@@ -138,10 +130,7 @@
         "RS512",
         "ES256",
         "ES384",
-        "ES512",
-        "PS256",
-        "PS384",
-        "PS512"
+        "ES512"
     ],
     "dynamicRegistrationCustomAttributes":[
         "oxAuthTrustedClient"
@@ -199,7 +188,6 @@
     "keyRegenerationInterval":48,
     "defaultSignatureAlgorithm":"RS256",
     "oxOpenIdConnectVersion":"openidconnect-1.0",
-    "organizationInum":"%(inumOrg)s",
     "oxId":"https://%(hostname)s/oxid/service/gluu/inum",
     "dynamicRegistrationEnabled":true,
     "dynamicRegistrationExpirationTime":-1,
@@ -222,13 +210,13 @@
             "filter":"(&(mail=*{0}*)(inum={1}))",
             "bind":false,
             "bindPasswordAttribute":"",
-            "baseDn":"o=gluu"
+            "baseDn":"ou=people,o=gluu"
         },
         {
             "filter":"uid={0}",
             "bind":true,
             "bindPasswordAttribute":"pwd",
-            "baseDn":"o=gluu"
+            "baseDn":"ou=people,o=gluu"
         }
     ],
     "clientAuthenticationFilters":[
@@ -236,10 +224,9 @@
             "filter":"myCustomAttr1={0}",
             "bind":"",
             "bindPasswordAttribute":"",
-            "baseDn":"ou=clients,o=%(inumOrg)s,o=gluu"
+            "baseDn":"ou=clients,o=gluu"
         }
     ],
-    "applianceInum":"%(inumAppliance)s",
     "sessionIdUnusedLifetime":86400,
     "sessionIdUnauthenticatedUnusedLifetime":120,
     "sessionIdEnabled":true,

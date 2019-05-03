@@ -145,7 +145,7 @@ def export_openid_keys(keystore, keypasswd, alias, export_file):
     cmd = " ".join([
         "java",
         "-cp /opt/config-init/javalibs/oxauth-client.jar",
-        "org.xdi.oxauth.util.KeyExporter",
+        "org.gluu.oxauth.util.KeyExporter",
         "-keystore {}".format(keystore),
         "-keypasswd '{}'".format(keypasswd),
         "-alias '{}'".format(alias),
@@ -175,9 +175,11 @@ def generate_pkcs12(suffix, passwd, hostname):
     assert retcode == 0, "Failed to generate PKCS12 file; reason={}".format(err)
 
 
+# def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
+#                  city, ldap_type="opendj", base_inum="", inum_org="",
+#                  inum_appliance="", persistence_type="ldap"):
 def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
-                 city, ldap_type="opendj", base_inum="", inum_org="",
-                 inum_appliance=""):
+                 city, ldap_type="opendj", persistence_type="ldap"):
     """Generates config and secret contexts.
     """
     ctx = {"config": {}, "secret": {}}
@@ -228,6 +230,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
         "ldap_truststore_pass", get_random_chars())
 
     ctx["config"]["ldap_type"] = get_or_set_config("ldap_type", ldap_type)
+    ctx["config"]["persistence_type"] = get_or_set_config("persistence_type", persistence_type)
 
     ldap_binddn = "cn=directory manager"
     ldap_site_binddn = "cn=directory manager"
@@ -313,32 +316,33 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ====
     # Inum
     # ====
-    ctx["config"]["baseInum"] = get_or_set_config(
-        "baseInum",
-        base_inum or "@!{}".format(join_quad_str(4))
-    )
+    # ctx["config"]["baseInum"] = get_or_set_config(
+    #     "baseInum",
+    #     base_inum or "@!{}".format(join_quad_str(4))
+    # )
 
-    ctx["config"]["inumOrg"] = get_or_set_config(
-        "inumOrg",
-        inum_org or "{}!0001!{}".format(ctx["config"]["baseInum"], join_quad_str(2)),
-    )
+    # ctx["config"]["inumOrg"] = get_or_set_config(
+    #     "inumOrg",
+    #     inum_org or "{}!0001!{}".format(ctx["config"]["baseInum"], join_quad_str(2)),
+    # )
 
-    ctx["config"]["inumOrgFN"] = get_or_set_config("inumOrgFN", safe_inum_str(ctx["config"]["inumOrg"]))
+    # ctx["config"]["inumOrgFN"] = get_or_set_config("inumOrgFN", safe_inum_str(ctx["config"]["inumOrg"]))
 
-    ctx["config"]["inumAppliance"] = get_or_set_config(
-        "inumAppliance",
-        inum_appliance or "{}!0002!{}".format(ctx["config"]["baseInum"], join_quad_str(2)),
-    )
+    # ctx["config"]["inumAppliance"] = get_or_set_config(
+    #     "inumAppliance",
+    #     inum_appliance or "{}!0002!{}".format(ctx["config"]["baseInum"], join_quad_str(2)),
+    # )
 
-    ctx["config"]["inumApplianceFN"] = get_or_set_config(
-        "inumApplianceFN", safe_inum_str(ctx["config"]["inumAppliance"]))
+    # ctx["config"]["inumApplianceFN"] = get_or_set_config(
+    #     "inumApplianceFN", safe_inum_str(ctx["config"]["inumAppliance"]))
 
     # ======
     # oxAuth
     # ======
     ctx["config"]["oxauth_client_id"] = get_or_set_config(
         "oxauth_client_id",
-        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        "0008-e701-4470-b6b4-0fee15ca666f",
     )
 
     ctx["secret"]["oxauthClient_encoded_pw"] = get_or_set_secret(
@@ -401,7 +405,8 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # =======
     ctx["config"]["scim_rs_client_id"] = get_or_set_config(
         "scim_rs_client_id",
-        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        "0008-6e01-43a4-af05-29a7dc9e49bc",
     )
 
     ctx["config"]["scim_rs_client_jks_fn"] = get_or_set_config(
@@ -442,7 +447,8 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # =======
     ctx["config"]["scim_rp_client_id"] = get_or_set_config(
         "scim_rp_client_id",
-        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        "0008-61d5-49c3-861a-d5ee2c2f7709",
     )
 
     ctx["config"]["scim_rp_client_jks_fn"] = get_or_set_config(
@@ -488,7 +494,8 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ===========
     ctx["config"]["passport_rs_client_id"] = get_or_set_config(
         "passport_rs_client_id",
-        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        "0008-fca1-48a6-a62f-9681dbb8816d",
     )
 
     ctx["config"]["passport_rs_client_jks_fn"] = get_or_set_config(
@@ -529,7 +536,14 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ===========
     ctx["config"]["passport_rp_client_id"] = get_or_set_config(
         "passport_rp_client_id",
-        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        "0008-de0c-476a-9c9f-9c0f079c72d1",
+    )
+
+    ctx["config"]["passport_rp_ii_client_id"] = get_or_set_config(
+        "passport_rp_ii_client_id",
+        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        "0008-4252-4d65-8bc0-58ad3825a401",
     )
 
     ctx["secret"]["passport_rp_client_jks_pass"] = get_or_set_secret(
@@ -616,13 +630,18 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
             encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
         )
 
+    ctx["secret"]["passport_central_config_base64"] = get_or_set_secret(
+        "passport_central_config_base64",
+        encode_template("passport-central-config.json", ctx)
+    )
+
     # ========
     # oxAsimba
     # ========
-    ctx["secret"]["oxasimba_config_base64"] = get_or_set_secret(
-        "oxasimba_config_base64",
-        encode_template("oxasimba-config.json", ctx),
-    )
+    # ctx["secret"]["oxasimba_config_base64"] = get_or_set_secret(
+    #     "oxasimba_config_base64",
+    #     encode_template("oxasimba-config.json", ctx),
+    # )
 
     # ================
     # SSL cert and key
@@ -660,7 +679,8 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ===================
     ctx["config"]["idp_client_id"] = get_or_set_config(
         "idp_client_id",
-        "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
+        "0008-7e44-4734-9360-d4fe9767884d",
     )
 
     ctx["secret"]["idpClient_encoded_pw"] = get_or_set_secret(
@@ -770,6 +790,64 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
             "sealer_jks_base64",
             encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
         )
+
+    # ==============
+    # oxTrust API RS
+    # ==============
+    ctx["config"]["api_rs_client_jks_fn"] = get_or_set_config(
+        "api_rs_client_jks_fn", "/etc/certs/api-rs.jks")
+
+    ctx["config"]["api_rs_client_jwks_fn"] = get_or_set_config(
+        "api_rs_client_jwks_fn", "/etc/certs/api-rs-keys.json")
+
+    ctx["secret"]["api_rs_client_jks_pass"] = get_or_set_secret(
+        "api_rs_client_jks_pass", "secret",
+    )
+    ctx["secret"]["api_rs_client_jks_pass_encoded"] = get_or_set_secret(
+        "api_rs_client_jks_pass_encoded",
+        encrypt_text(ctx["secret"]["api_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+    )
+    generate_openid_keys(
+        ctx["secret"]["api_rs_client_jks_pass"],
+        ctx["config"]["api_rs_client_jks_fn"],
+        ctx["config"]["api_rs_client_jwks_fn"],
+        ctx["config"]["default_openid_jks_dn_name"],
+    )
+
+    basedir, fn = os.path.split(ctx["config"]["api_rs_client_jwks_fn"])
+    ctx["secret"]["api_rs_client_base64_jwks"] = get_or_set_secret(
+        "api_rs_client_base64_jwks",
+        encode_template(fn, ctx, basedir),
+    )
+
+    # ==============
+    # oxTrust API RP
+    # ==============
+    ctx["config"]["api_rp_client_jks_fn"] = get_or_set_config(
+        "api_rp_client_jks_fn", "/etc/certs/api-rp.jks")
+
+    ctx["config"]["api_rp_client_jwks_fn"] = get_or_set_config(
+        "api_rp_client_jwks_fn", "/etc/certs/api-rp-keys.json")
+
+    ctx["secret"]["api_rp_client_jks_pass"] = get_or_set_secret(
+        "api_rp_client_jks_pass", "secret",
+    )
+    ctx["secret"]["api_rp_client_jks_pass_encoded"] = get_or_set_secret(
+        "api_rp_client_jks_pass_encoded",
+        encrypt_text(ctx["secret"]["api_rp_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+    )
+    generate_openid_keys(
+        ctx["secret"]["api_rp_client_jks_pass"],
+        ctx["config"]["api_rp_client_jks_fn"],
+        ctx["config"]["api_rp_client_jwks_fn"],
+        ctx["config"]["default_openid_jks_dn_name"],
+    )
+
+    basedir, fn = os.path.split(ctx["config"]["api_rp_client_jwks_fn"])
+    ctx["secret"]["api_rp_client_base64_jwks"] = get_or_set_secret(
+        "api_rp_client_base64_jwks",
+        encode_template(fn, ctx, basedir),
+    )
 
     # populated config
     return ctx
@@ -882,7 +960,7 @@ def generate_keystore(suffix, domain, keypasswd):
 
 def gen_idp3_key(shibJksPass):
     out, err, retcode = exec_cmd("java -classpath /opt/config-init/javalibs/idp3_cml_keygenerator.jar "
-                                 "'org.xdi.oxshibboleth.keygenerator.KeyGenerator' "
+                                 "'org.gluu.oxshibboleth.keygenerator.KeyGenerator' "
                                  "/etc/certs {}".format(shibJksPass))
     return out, err, retcode
 
@@ -965,11 +1043,14 @@ def cli():
 @click.option("--state", required=True, help="State.")
 @click.option("--city", required=True, help="City.")
 @click.option("--ldap-type", default="opendj", type=click.Choice(["opendj"]), help="LDAP choice")
-@click.option("--base-inum", default="", help="Base inum.", show_default=True)
-@click.option("--inum-org", default="", help="Organization inum.", show_default=True)
-@click.option("--inum-appliance", default="", help="Appliance inum.", show_default=True)
+# @click.option("--base-inum", default="", help="Base inum.", show_default=True)
+# @click.option("--inum-org", default="", help="Organization inum.", show_default=True)
+# @click.option("--inum-appliance", default="", help="Appliance inum.", show_default=True)
+@click.option("--persistence-type", default="ldap", type=click.Choice(["ldap", "couchbase"]), help="Persistence choice")
+# def generate(admin_pw, email, domain, org_name, country_code, state, city,
+#              ldap_type, base_inum, inum_org, inum_appliance, persistence_type):
 def generate(admin_pw, email, domain, org_name, country_code, state, city,
-             ldap_type, base_inum, inum_org, inum_appliance):
+             ldap_type, persistence_type):
     """Generates initial config and secret and save them into KV.
     """
     def _save_generated_ctx(ctx_manager, filepath, data):
@@ -991,8 +1072,9 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city,
     # tolerancy before checking existing key
     time.sleep(5)
     ctx = generate_ctx(admin_pw, email, domain, org_name, country_code,
-                       state, city, ldap_type, base_inum, inum_org,
-                       inum_appliance)
+                       state, city, ldap_type, persistence_type)
+    # state, city, ldap_type, base_inum, inum_org,
+    # inum_appliance, persistence_type)
 
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
@@ -1100,7 +1182,7 @@ def migrate(overwrite, prune):
         'passportSpJksPass',
         'passport_sp_cert_base64',
         'passport_sp_key_base64',
-        'oxasimba_config_base64',
+        # 'oxasimba_config_base64',
         'ssl_cert',
         'ssl_key',
         'idpClient_encoded_pw',

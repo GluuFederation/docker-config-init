@@ -17,13 +17,13 @@ RUN apk update && apk add --no-cache \
 # ====
 
 # JAR files required to generate OpenID Connect keys
-ENV OX_VERSION 3.1.6.Final
-ENV OXAUTH_CLIENT_BUILD_DATE 2019-03-19
-ENV OXSHIBBOLETH_KEYGEN_BUILD_DATE 2019-03-22
+ENV OX_VERSION 4.0.0-SNAPSHOT
+ENV OXAUTH_CLIENT_BUILD_DATE 2019-04-30
+ENV OXSHIBBOLETH_KEYGEN_BUILD_DATE 2019-04-25
 
 RUN mkdir -p /opt/config-init/javalibs
-RUN wget -q https://ox.gluu.org/maven/org/xdi/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/oxauth-client.jar
-RUN wget -q https://ox.gluu.org/maven/org/xdi/oxShibbolethKeyGenerator/${OX_VERSION}/oxShibbolethKeyGenerator-${OX_VERSION}.jar -O /opt/config-init/javalibs/idp3_cml_keygenerator.jar
+RUN wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/oxauth-client.jar
+RUN wget -q https://ox.gluu.org/maven/org/gluu/oxShibbolethKeyGenerator/${OX_VERSION}/oxShibbolethKeyGenerator-${OX_VERSION}.jar -O /opt/config-init/javalibs/idp3_cml_keygenerator.jar
 
 # ====
 # Tini
