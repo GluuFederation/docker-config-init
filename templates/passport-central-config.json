@@ -7,7 +7,7 @@
         "spTLSKey": "%(passportSpTLSKey)s",
         "logging": {
             "level": "info",
-            "consoleLogOnly" : false,
+            "consoleLogOnly" : true,
             "activeMQConf": {
                 "enabled": false,
                 "host": "",
