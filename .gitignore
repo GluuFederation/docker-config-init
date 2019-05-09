@@ -100,3 +100,5 @@ ENV/
 # mypy
 .mypy_cache/
 tmp
+static/extension/client_registration/Casa.py
+static/extension/person_authentication/Casa.py
