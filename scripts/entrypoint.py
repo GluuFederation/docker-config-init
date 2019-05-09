@@ -92,10 +92,6 @@ def join_quad_str(x):
     return ".".join([get_quad() for _ in xrange(x)])
 
 
-def safe_inum_str(x):
-    return x.replace("@", "").replace("!", "").replace(".", "")
-
-
 def encode_template(fn, ctx, base_dir="/opt/config-init/templates"):
     path = os.path.join(base_dir, fn)
     # ctx is nested which has `config` and `secret` keys
@@ -175,9 +171,6 @@ def generate_pkcs12(suffix, passwd, hostname):
     assert retcode == 0, "Failed to generate PKCS12 file; reason={}".format(err)
 
 
-# def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
-#                  city, ldap_type="opendj", base_inum="", inum_org="",
-#                  inum_appliance="", persistence_type="ldap"):
 def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
                  city, ldap_type="opendj", persistence_type="ldap"):
     """Generates config and secret contexts.
@@ -313,35 +306,11 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     ctx["secret"]["encoded_ox_replication_pw"] = get_or_set_secret(
         "encoded_ox_replication_pw", ctx["secret"]["encoded_ox_ldap_pw"])
 
-    # ====
-    # Inum
-    # ====
-    # ctx["config"]["baseInum"] = get_or_set_config(
-    #     "baseInum",
-    #     base_inum or "@!{}".format(join_quad_str(4))
-    # )
-
-    # ctx["config"]["inumOrg"] = get_or_set_config(
-    #     "inumOrg",
-    #     inum_org or "{}!0001!{}".format(ctx["config"]["baseInum"], join_quad_str(2)),
-    # )
-
-    # ctx["config"]["inumOrgFN"] = get_or_set_config("inumOrgFN", safe_inum_str(ctx["config"]["inumOrg"]))
-
-    # ctx["config"]["inumAppliance"] = get_or_set_config(
-    #     "inumAppliance",
-    #     inum_appliance or "{}!0002!{}".format(ctx["config"]["baseInum"], join_quad_str(2)),
-    # )
-
-    # ctx["config"]["inumApplianceFN"] = get_or_set_config(
-    #     "inumApplianceFN", safe_inum_str(ctx["config"]["inumAppliance"]))
-
     # ======
     # oxAuth
     # ======
     ctx["config"]["oxauth_client_id"] = get_or_set_config(
         "oxauth_client_id",
-        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
         "0008-e701-4470-b6b4-0fee15ca666f",
     )
 
@@ -405,7 +374,6 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # =======
     ctx["config"]["scim_rs_client_id"] = get_or_set_config(
         "scim_rs_client_id",
-        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
         "0008-6e01-43a4-af05-29a7dc9e49bc",
     )
 
@@ -447,7 +415,6 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # =======
     ctx["config"]["scim_rp_client_id"] = get_or_set_config(
         "scim_rp_client_id",
-        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
         "0008-61d5-49c3-861a-d5ee2c2f7709",
     )
 
@@ -494,7 +461,6 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ===========
     ctx["config"]["passport_rs_client_id"] = get_or_set_config(
         "passport_rs_client_id",
-        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
         "0008-fca1-48a6-a62f-9681dbb8816d",
     )
 
@@ -536,13 +502,11 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ===========
     ctx["config"]["passport_rp_client_id"] = get_or_set_config(
         "passport_rp_client_id",
-        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
         "0008-de0c-476a-9c9f-9c0f079c72d1",
     )
 
     ctx["config"]["passport_rp_ii_client_id"] = get_or_set_config(
         "passport_rp_ii_client_id",
-        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
         "0008-4252-4d65-8bc0-58ad3825a401",
     )
 
@@ -679,7 +643,6 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ===================
     ctx["config"]["idp_client_id"] = get_or_set_config(
         "idp_client_id",
-        # "{}!0008!{}".format(ctx["config"]["inumOrg"], join_quad_str(2)),
         "0008-7e44-4734-9360-d4fe9767884d",
     )
 
@@ -1043,12 +1006,7 @@ def cli():
 @click.option("--state", required=True, help="State.")
 @click.option("--city", required=True, help="City.")
 @click.option("--ldap-type", default="opendj", type=click.Choice(["opendj"]), help="LDAP choice")
-# @click.option("--base-inum", default="", help="Base inum.", show_default=True)
-# @click.option("--inum-org", default="", help="Organization inum.", show_default=True)
-# @click.option("--inum-appliance", default="", help="Appliance inum.", show_default=True)
 @click.option("--persistence-type", default="ldap", type=click.Choice(["ldap", "couchbase"]), help="Persistence choice")
-# def generate(admin_pw, email, domain, org_name, country_code, state, city,
-#              ldap_type, base_inum, inum_org, inum_appliance, persistence_type):
 def generate(admin_pw, email, domain, org_name, country_code, state, city,
              ldap_type, persistence_type):
     """Generates initial config and secret and save them into KV.
@@ -1073,8 +1031,6 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city,
     time.sleep(5)
     ctx = generate_ctx(admin_pw, email, domain, org_name, country_code,
                        state, city, ldap_type, persistence_type)
-    # state, city, ldap_type, base_inum, inum_org,
-    # inum_appliance, persistence_type)
 
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
