@@ -208,9 +208,21 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
 
     ctx["config"]["fido2ConfigFolder"] = get_or_set_config("fido2ConfigFolder", "/etc/gluu/conf/fido2")
 
-    # ====
-    # LDAP
-    # ====
+    # ==========
+    # DB BACKEND
+    # ==========
+    ctx["config"]["ldap_type"] = get_or_set_config("ldap_type", ldap_type)
+    ctx["config"]["persistence_type"] = get_or_set_config("persistence_type", persistence_type)
+
+    # ======
+    # OpenDJ
+    # ======
+    ctx["secret"]["encoded_ldap_pw"] = get_or_set_secret("encoded_ldap_pw", ldap_encode(admin_pw))
+
+    ctx["secret"]["encoded_ox_ldap_pw"] = get_or_set_secret(
+        "encoded_ox_ldap_pw", encrypt_text(admin_pw, ctx["secret"]["encoded_salt"]),
+    )
+
     ctx["config"]["ldap_init_host"] = get_or_set_config("ldap_init_host", "localhost")
 
     ctx["config"]["ldap_init_port"] = int(get_or_set_config("ldap_init_port", 1636))
@@ -219,24 +231,17 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
 
     ctx["config"]["ldaps_port"] = int(get_or_set_config("ldaps_port", 1636))
 
+    ctx["config"]["ldap_binddn"] = get_or_set_config("ldap_binddn", "cn=directory manager")
+
+    ctx["config"]["ldap_site_binddn"] = get_or_set_config("ldap_site_binddn", "cn=directory manager")
+
     ctx["secret"]["ldap_truststore_pass"] = get_or_set_secret(
         "ldap_truststore_pass", get_random_chars())
 
-    ctx["config"]["ldap_type"] = get_or_set_config("ldap_type", ldap_type)
-    ctx["config"]["persistence_type"] = get_or_set_config("persistence_type", persistence_type)
-
-    ldap_binddn = "cn=directory manager"
-    ldap_site_binddn = "cn=directory manager"
-    ldapTrustStoreFn = "/etc/certs/opendj.pkcs12"
-
-    ctx["config"]["ldap_binddn"] = get_or_set_config("ldap_binddn", ldap_binddn)
-
-    ctx["config"]["ldap_site_binddn"] = get_or_set_config("ldap_site_binddn", ldap_site_binddn)
-
-    ctx["config"]["ldapTrustStoreFn"] = get_or_set_config("ldapTrustStoreFn", ldapTrustStoreFn)
+    ctx["config"]["ldapTrustStoreFn"] = get_or_set_config("ldapTrustStoreFn", "/etc/certs/opendj.pkcs12")
 
     generate_ssl_certkey(
-        ctx["config"]["ldap_type"],
+        "opendj",
         ctx["secret"]["ldap_truststore_pass"],
         ctx["config"]["admin_email"],
         ctx["config"]["hostname"],
@@ -246,23 +251,23 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
         ctx["config"]["city"],
     )
 
-    with open("/etc/certs/{}.crt".format(ctx["config"]["ldap_type"])) as fr:
-        ldap_ssl_cert = fr.read()
+    with open("/etc/certs/opendj.pem", "w") as fw:
+        with open("/etc/certs/opendj.crt") as fr:
+            ldap_ssl_cert = fr.read()
 
-        ctx["secret"]["ldap_ssl_cert"] = get_or_set_secret(
-            "ldap_ssl_cert",
-            encrypt_text(ldap_ssl_cert, ctx["secret"]["encoded_salt"]),
-        )
+            ctx["secret"]["ldap_ssl_cert"] = get_or_set_secret(
+                "ldap_ssl_cert",
+                encrypt_text(ldap_ssl_cert, ctx["secret"]["encoded_salt"]),
+            )
 
-    with open("/etc/certs/{}.key".format(ctx["config"]["ldap_type"])) as fr:
-        ldap_ssl_key = fr.read()
+        with open("/etc/certs/opendj.key") as fr:
+            ldap_ssl_key = fr.read()
 
-        ctx["secret"]["ldap_ssl_key"] = get_or_set_secret(
-            "ldap_ssl_key",
-            encrypt_text(ldap_ssl_key, ctx["secret"]["encoded_salt"]),
-        )
+            ctx["secret"]["ldap_ssl_key"] = get_or_set_secret(
+                "ldap_ssl_key",
+                encrypt_text(ldap_ssl_key, ctx["secret"]["encoded_salt"]),
+            )
 
-    with open("/etc/certs/{}.pem".format(ctx["config"]["ldap_type"]), "w") as fw:
         ldap_ssl_cacert = "".join([ldap_ssl_cert, ldap_ssl_key])
         fw.write(ldap_ssl_cacert)
 
@@ -272,7 +277,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
         )
 
     generate_pkcs12(
-        ctx["config"]["ldap_type"],
+        "opendj",
         ctx["secret"]["ldap_truststore_pass"],
         ctx["config"]["hostname"],
     )
@@ -287,24 +292,69 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
         encrypt_text(ctx["secret"]["ldap_truststore_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    ctx["secret"]["encoded_ldap_pw"] = get_or_set_secret("encoded_ldap_pw", ldap_encode(admin_pw))
+    # =========
+    # CouchBase
+    # =========
+    ctx["config"]["couchbase_server_user"] = "admin"
 
-    ctx["secret"]["encoded_ox_ldap_pw"] = get_or_set_secret(
-        "encoded_ox_ldap_pw", encrypt_text(admin_pw, ctx["secret"]["encoded_salt"]),
+    ctx["secret"]["encoded_couchbase_server_pw"] = ctx["secret"]["encoded_ox_ldap_pw"]
+
+    ctx["secret"]["couchbase_truststore_pass"] = get_or_set_secret(
+        "couchbase_truststore_pass", "newsecret")
+
+    ctx["config"]["couchbaseTrustStoreFn"] = get_or_set_config("couchbaseTrustStoreFn", "/etc/certs/couchbase.pkcs12")
+
+    generate_ssl_certkey(
+        "couchbase",
+        ctx["secret"]["couchbase_truststore_pass"],
+        ctx["config"]["admin_email"],
+        ctx["config"]["hostname"],
+        ctx["config"]["orgName"],
+        ctx["config"]["country_code"],
+        ctx["config"]["state"],
+        ctx["config"]["city"],
     )
 
-    ctx["config"]["ldap_use_ssl"] = as_boolean(get_or_set_config("ldap_use_ssl", True))
+    with open("/etc/certs/couchbase.pem", "w") as fw:
+        with open("/etc/certs/couchbase.crt") as fr:
+            couchbase_ssl_cert = fr.read()
 
-    ctx["config"]["replication_cn"] = get_or_set_config("replication_cn", "replicator")
+            ctx["secret"]["couchbase_ssl_cert"] = get_or_set_secret(
+                "couchbase_ssl_cert",
+                encrypt_text(couchbase_ssl_cert, ctx["secret"]["encoded_salt"]),
+            )
 
-    ctx["config"]["replication_dn"] = get_or_set_config(
-        "replication_dn", "cn={},o=gluu".format(ctx["config"]["replication_cn"]))
+        with open("/etc/certs/couchbase.key") as fr:
+            couchbase_ssl_key = fr.read()
 
-    ctx["secret"]["encoded_replication_pw"] = get_or_set_secret(
-        "encoded_replication_pw", ctx["secret"]["encoded_ldap_pw"])
+            ctx["secret"]["couchbase_ssl_key"] = get_or_set_secret(
+                "couchbase_ssl_key",
+                encrypt_text(couchbase_ssl_key, ctx["secret"]["encoded_salt"]),
+            )
 
-    ctx["secret"]["encoded_ox_replication_pw"] = get_or_set_secret(
-        "encoded_ox_replication_pw", ctx["secret"]["encoded_ox_ldap_pw"])
+        couchbase_ssl_cacert = "".join([couchbase_ssl_cert, couchbase_ssl_key])
+        fw.write(couchbase_ssl_cacert)
+
+        ctx["secret"]["couchbase_ssl_cacert"] = get_or_set_secret(
+            "couchbase_ssl_cacert",
+            encrypt_text(couchbase_ssl_cacert, ctx["secret"]["encoded_salt"]),
+        )
+
+    generate_pkcs12(
+        "couchbase",
+        ctx["secret"]["couchbase_truststore_pass"],
+        ctx["config"]["hostname"],
+    )
+    with open(ctx["config"]["couchbaseTrustStoreFn"], "rb") as fr:
+        ctx["secret"]["couchbase_pkcs12_base64"] = get_or_set_secret(
+            "couchbase_pkcs12_base64",
+            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+        )
+
+    ctx["secret"]["encoded_couchbaseTrustStorePass"] = get_or_set_secret(
+        "encoded_couchbaseTrustStorePass",
+        encrypt_text(ctx["secret"]["couchbase_truststore_pass"], ctx["secret"]["encoded_salt"]),
+    )
 
     # ======
     # oxAuth
@@ -997,6 +1047,18 @@ def cli():
     pass
 
 
+LDAP_TYPES = [
+    "opendj",
+    "couchbase",
+]
+
+PERSISTENCE_TYPES = [
+    "ldap",
+    "couchbase",
+    # "hybrid",
+]
+
+
 @cli.command()
 @click.option("--admin-pw", required=True, help="Password for admin access.")
 @click.option("--email", required=True, help="Email for support.")
@@ -1005,8 +1067,8 @@ def cli():
 @click.option("--country-code", required=True, help="Country code.", callback=validate_country_code)
 @click.option("--state", required=True, help="State.")
 @click.option("--city", required=True, help="City.")
-@click.option("--ldap-type", default="opendj", type=click.Choice(["opendj"]), help="LDAP choice")
-@click.option("--persistence-type", default="ldap", type=click.Choice(["ldap", "couchbase"]), help="Persistence choice")
+@click.option("--ldap-type", default="opendj", type=click.Choice(LDAP_TYPES), help="LDAP choice")
+@click.option("--persistence-type", default="ldap", type=click.Choice(PERSISTENCE_TYPES), help="Persistence choice")
 def generate(admin_pw, email, domain, org_name, country_code, state, city,
              ldap_type, persistence_type):
     """Generates initial config and secret and save them into KV.
