@@ -293,68 +293,82 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     )
 
     # =========
-    # CouchBase
+    # Couchbase
     # =========
     ctx["config"]["couchbase_server_user"] = "admin"
 
     ctx["secret"]["encoded_couchbase_server_pw"] = ctx["secret"]["encoded_ox_ldap_pw"]
 
+    # TODO: dynamic
+    couchbase_truststore_pass = "newsecret"
+
     ctx["secret"]["couchbase_truststore_pass"] = get_or_set_secret(
-        "couchbase_truststore_pass", "newsecret")
+        "couchbase_truststore_pass", couchbase_truststore_pass)
 
     ctx["config"]["couchbaseTrustStoreFn"] = get_or_set_config("couchbaseTrustStoreFn", "/etc/certs/couchbase.pkcs12")
-
-    generate_ssl_certkey(
-        "couchbase",
-        ctx["secret"]["couchbase_truststore_pass"],
-        ctx["config"]["admin_email"],
-        ctx["config"]["hostname"],
-        ctx["config"]["orgName"],
-        ctx["config"]["country_code"],
-        ctx["config"]["state"],
-        ctx["config"]["city"],
-    )
-
-    with open("/etc/certs/couchbase.pem", "w") as fw:
-        with open("/etc/certs/couchbase.crt") as fr:
-            couchbase_ssl_cert = fr.read()
-
-            ctx["secret"]["couchbase_ssl_cert"] = get_or_set_secret(
-                "couchbase_ssl_cert",
-                encrypt_text(couchbase_ssl_cert, ctx["secret"]["encoded_salt"]),
-            )
-
-        with open("/etc/certs/couchbase.key") as fr:
-            couchbase_ssl_key = fr.read()
-
-            ctx["secret"]["couchbase_ssl_key"] = get_or_set_secret(
-                "couchbase_ssl_key",
-                encrypt_text(couchbase_ssl_key, ctx["secret"]["encoded_salt"]),
-            )
-
-        couchbase_ssl_cacert = "".join([couchbase_ssl_cert, couchbase_ssl_key])
-        fw.write(couchbase_ssl_cacert)
-
-        ctx["secret"]["couchbase_ssl_cacert"] = get_or_set_secret(
-            "couchbase_ssl_cacert",
-            encrypt_text(couchbase_ssl_cacert, ctx["secret"]["encoded_salt"]),
-        )
-
-    generate_pkcs12(
-        "couchbase",
-        ctx["secret"]["couchbase_truststore_pass"],
-        ctx["config"]["hostname"],
-    )
-    with open(ctx["config"]["couchbaseTrustStoreFn"], "rb") as fr:
-        ctx["secret"]["couchbase_pkcs12_base64"] = get_or_set_secret(
-            "couchbase_pkcs12_base64",
-            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
-        )
 
     ctx["secret"]["encoded_couchbaseTrustStorePass"] = get_or_set_secret(
         "encoded_couchbaseTrustStorePass",
         encrypt_text(ctx["secret"]["couchbase_truststore_pass"], ctx["secret"]["encoded_salt"]),
     )
+
+    generate_couchbase_certs(country_code, state, city, org_name, domain, email)
+
+    with open("/etc/certs/couchbase_chain.pem", "w") as fw:
+        with open("/etc/certs/couchbase_pkey.pem") as f:
+            node_pem = f.read()
+
+        with open("/etc/certs/couchbase_int.pem") as f:
+            intermediate_pem = f.read()
+
+        chain_pem = "".join([node_pem, intermediate_pem])
+        fw.write(chain_pem)
+
+        # updating couchbase node cert requires couchbase_chain.pem
+        ctx["secret"]["couchbase_chain_cert"] = get_or_set_secret(
+            "couchbase_chain_cert",
+            encrypt_text(chain_pem, ctx["secret"]["encoded_salt"])
+        )
+
+    # updating couchbase node cert requires couchbase_pkey.key
+    with open("/etc/certs/couchbase_pkey.key") as f:
+        pkey_key = f.read()
+
+        ctx["secret"]["couchbase_node_key"] = get_or_set_secret(
+            "couchbase_node_key",
+            encrypt_text(pkey_key, ctx["secret"]["encoded_salt"])
+        )
+
+    # updating couchbase cluster cert requires couchbase_ca.pem
+    with open("/etc/certs/couchbase_ca.pem") as f:
+        ca_pem = f.read()
+
+        ctx["secret"]["couchbase_cluster_cert"] = get_or_set_secret(
+            "couchbase_cluster_cert",
+            encrypt_text(ca_pem, ctx["secret"]["encoded_salt"])
+        )
+
+    _, err, retcode = exec_cmd(
+        "keytool -import -trustcacerts "
+        "-alias {0}_couchbase "
+        "-file {1} "
+        "-keystore {2} "
+        "-storepass {3} "
+        "-storetype pkcs12 "
+        "-noprompt".format(
+            domain,
+            "/etc/certs/couchbase_ca.pem",
+            ctx["config"]["couchbaseTrustStoreFn"],
+            couchbase_truststore_pass,
+        )
+    )
+    assert retcode == 0, "Failed to generate couchbase.pkcs12; reason={}".format(err)
+
+    with open(ctx["config"]["couchbaseTrustStoreFn"], "rb") as fr:
+        ctx["secret"]["couchbase_pkcs12_base64"] = get_or_set_secret(
+            "couchbase_pkcs12_base64",
+            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+        )
 
     # ======
     # oxAuth
@@ -862,6 +876,23 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
         encode_template(fn, ctx, basedir),
     )
 
+    ctx["config"]["oxtrust_requesting_party_client_id"] = get_or_set_config(
+        "oxtrust_requesting_party_client_id",
+        '0008-' + str(uuid.uuid4()),
+    )
+    ctx["config"]["oxtrust_resource_server_client_id"] = get_or_set_config(
+        "oxtrust_resource_server_client_id",
+        '0008-' + str(uuid.uuid4()),
+    )
+    ctx["config"]["oxtrust_resource_id"] = get_or_set_config(
+        "oxtrust_resource_id",
+        '0008-' + str(uuid.uuid4()),
+    )
+    ctx["config"]["passport_resource_id"] = get_or_set_config(
+        "passport_resource_id",
+        '0008-' + str(uuid.uuid4()),
+    )
+
     # populated config
     return ctx
 
@@ -1242,6 +1273,81 @@ def migrate(overwrite, prune):
         if prune and manager.secret.adapter.get(k):
             click.echo("deleting {} from config".format(k))
             manager.config.delete(k)
+
+
+def generate_couchbase_certs(country_code, state, city, org_name, domain, email):
+    root_ca = "couchbase_ca"
+    intermediate = "couchbase_int"
+    node = "couchbase_pkey"
+
+    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(root_ca))
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(root_ca, err)
+
+    _, err, retcode = exec_cmd(
+        "openssl req -new -x509 -sha256 "
+        "-days 365 "
+        "-key /etc/certs/{0}.key "
+        "-out /etc/certs/{0}.pem "
+        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
+            root_ca, country_code, state, city, org_name, domain, email
+        ),
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(root_ca, err)
+
+    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(intermediate))
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(intermediate, err)
+
+    _, err, retcode = exec_cmd(
+        "openssl req -new "
+        "-key /etc/certs/{0}.key "
+        "-out /etc/certs/{0}.csr "
+        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
+            intermediate, country_code, state, city, org_name, domain, email
+        ),
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(intermediate, err)
+
+    V3_CA_EXT = """subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints = CA:true"""
+    with open("/etc/certs/couchbase_v3_ca.ext", "w") as f:
+        f.write(V3_CA_EXT)
+
+    _, err, retcode = exec_cmd(
+        "openssl x509 -req "
+        "-in /etc/certs/{0}.csr "
+        "-CA /etc/certs/{1}.pem "
+        "-CAkey /etc/certs/{1}.key "
+        "-CAcreateserial -CAserial /etc/certs/{1}.srl "
+        "-extfile /etc/certs/couchbase_v3_ca.ext "
+        "-out /etc/certs/{0}.pem "
+        "-days 365".format(intermediate, root_ca)
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(intermediate, err)
+
+    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(node))
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(node, err)
+
+    _, err, retcode = exec_cmd(
+        "openssl req -new "
+        "-key /etc/certs/{0}.key "
+        "-out /etc/certs/{0}.csr "
+        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
+            node, country_code, state, city, org_name, domain, email
+        ),
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(node, err)
+
+    _, err, retcode = exec_cmd(
+        "openssl x509 -req "
+        "-in /etc/certs/{0}.csr "
+        "-CA /etc/certs/{1}.pem "
+        "-CAkey /etc/certs/{1}.key "
+        "-CAcreateserial -CAserial /etc/certs/{1}.srl "
+        "-out /etc/certs/{0}.pem "
+        "-days 365".format(node, intermediate)
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(node, err)
 
 
 if __name__ == "__main__":
