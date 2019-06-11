@@ -17,8 +17,8 @@ RUN apk update && apk add --no-cache \
 
 # JAR files required to generate OpenID Connect keys
 ENV OX_VERSION 4.0.0-SNAPSHOT
-ENV OXAUTH_CLIENT_BUILD_DATE 2019-05-10
-ENV OXSHIBBOLETH_KEYGEN_BUILD_DATE 2019-05-10
+ENV OXAUTH_CLIENT_BUILD_DATE 2019-06-10
+ENV OXSHIBBOLETH_KEYGEN_BUILD_DATE 2019-05-31
 
 RUN mkdir -p /opt/config-init/javalibs
 RUN wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/oxauth-client.jar
@@ -102,7 +102,6 @@ COPY templates /opt/config-init/templates
 COPY static /opt/config-init/static
 
 RUN mkdir -p /etc/certs /opt/config-init/db
-RUN chmod +x /opt/config-init/scripts/entrypoint.sh
 
 # # create gluu user
 # RUN useradd -ms /bin/sh --uid 1000 gluu \
@@ -116,5 +115,5 @@ RUN chmod +x /opt/config-init/scripts/entrypoint.sh
 # # run the entrypoint as gluu user
 # USER 1000
 
-ENTRYPOINT ["tini", "-g", "--", "/opt/config-init/scripts/entrypoint.sh"]
+ENTRYPOINT ["tini", "-g", "--", "sh", "/opt/config-init/scripts/entrypoint.sh"]
 CMD ["--help"]
