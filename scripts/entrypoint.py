@@ -375,7 +375,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ======
     ctx["config"]["oxauth_client_id"] = get_or_set_config(
         "oxauth_client_id",
-        "0008-e701-4470-b6b4-0fee15ca666f",
+        "0008-{}".format(uuid.uuid4()),
     )
 
     ctx["secret"]["oxauthClient_encoded_pw"] = get_or_set_secret(
@@ -438,7 +438,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # =======
     ctx["config"]["scim_rs_client_id"] = get_or_set_config(
         "scim_rs_client_id",
-        "0008-6e01-43a4-af05-29a7dc9e49bc",
+        "0008-{}".format(uuid.uuid4()),
     )
 
     ctx["config"]["scim_rs_client_jks_fn"] = get_or_set_config(
@@ -479,7 +479,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # =======
     ctx["config"]["scim_rp_client_id"] = get_or_set_config(
         "scim_rp_client_id",
-        "0008-61d5-49c3-861a-d5ee2c2f7709",
+        "0008-{}".format(uuid.uuid4()),
     )
 
     ctx["config"]["scim_rp_client_jks_fn"] = get_or_set_config(
@@ -525,7 +525,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ===========
     ctx["config"]["passport_rs_client_id"] = get_or_set_config(
         "passport_rs_client_id",
-        "0008-fca1-48a6-a62f-9681dbb8816d",
+        "0008-{}".format(uuid.uuid4()),
     )
 
     ctx["config"]["passport_rs_client_jks_fn"] = get_or_set_config(
@@ -561,17 +561,22 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
             encrypt_text(fr.read(), ctx["secret"]["encoded_salt"])
         )
 
+    ctx["config"]["passport_resource_id"] = get_or_set_config(
+        "passport_resource_id",
+        '0008-{}'.format(uuid.uuid4()),
+    )
+
     # ===========
     # Passport RP
     # ===========
     ctx["config"]["passport_rp_client_id"] = get_or_set_config(
         "passport_rp_client_id",
-        "0008-de0c-476a-9c9f-9c0f079c72d1",
+        "0008-{}".format(uuid.uuid4()),
     )
 
     ctx["config"]["passport_rp_ii_client_id"] = get_or_set_config(
         "passport_rp_ii_client_id",
-        "0008-4252-4d65-8bc0-58ad3825a401",
+        "0008-{}".format(uuid.uuid4()),
     )
 
     ctx["secret"]["passport_rp_client_jks_pass"] = get_or_set_secret(
@@ -707,7 +712,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     # ===================
     ctx["config"]["idp_client_id"] = get_or_set_config(
         "idp_client_id",
-        "0008-7e44-4734-9360-d4fe9767884d",
+        "0008-{}".format(uuid.uuid4()),
     )
 
     ctx["secret"]["idpClient_encoded_pw"] = get_or_set_secret(
@@ -846,6 +851,14 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
         "api_rs_client_base64_jwks",
         encode_template(fn, ctx, basedir),
     )
+    ctx["config"]["oxtrust_resource_server_client_id"] = get_or_set_config(
+        "oxtrust_resource_server_client_id",
+        '0008-{}'.format(uuid.uuid4()),
+    )
+    ctx["config"]["oxtrust_resource_id"] = get_or_set_config(
+        "oxtrust_resource_id",
+        '0008-{}'.format(uuid.uuid4()),
+    )
 
     # ==============
     # oxTrust API RP
@@ -878,19 +891,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
 
     ctx["config"]["oxtrust_requesting_party_client_id"] = get_or_set_config(
         "oxtrust_requesting_party_client_id",
-        '0008-' + str(uuid.uuid4()),
-    )
-    ctx["config"]["oxtrust_resource_server_client_id"] = get_or_set_config(
-        "oxtrust_resource_server_client_id",
-        '0008-' + str(uuid.uuid4()),
-    )
-    ctx["config"]["oxtrust_resource_id"] = get_or_set_config(
-        "oxtrust_resource_id",
-        '0008-' + str(uuid.uuid4()),
-    )
-    ctx["config"]["passport_resource_id"] = get_or_set_config(
-        "passport_resource_id",
-        '0008-' + str(uuid.uuid4()),
+        '0008-{}'.format(uuid.uuid4()),
     )
 
     # populated config
@@ -1231,7 +1232,6 @@ def migrate(overwrite, prune):
         'passportSpJksPass',
         'passport_sp_cert_base64',
         'passport_sp_key_base64',
-        # 'oxasimba_config_base64',
         'ssl_cert',
         'ssl_key',
         'idpClient_encoded_pw',
