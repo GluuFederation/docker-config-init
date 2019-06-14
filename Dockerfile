@@ -17,7 +17,7 @@ RUN apk update && apk add --no-cache \
 
 # JAR files required to generate OpenID Connect keys
 ENV OX_VERSION 4.0.0-SNAPSHOT
-ENV OXAUTH_CLIENT_BUILD_DATE 2019-06-10
+ENV OXAUTH_CLIENT_BUILD_DATE 2019-06-14
 ENV OXSHIBBOLETH_KEYGEN_BUILD_DATE 2019-05-31
 
 RUN mkdir -p /opt/config-init/javalibs
