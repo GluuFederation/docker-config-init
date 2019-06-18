@@ -298,6 +298,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     ctx["config"]["couchbase_server_user"] = "admin"
 
     ctx["secret"]["encoded_couchbase_server_pw"] = ctx["secret"]["encoded_ox_ldap_pw"]
+    ctx["secret"]["couchbase_shib_user_password"] = get_random_chars()
 
     # TODO: dynamic
     couchbase_truststore_pass = "newsecret"
