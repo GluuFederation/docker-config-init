@@ -328,7 +328,8 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
         # updating couchbase node cert requires couchbase_chain.pem
         ctx["secret"]["couchbase_chain_cert"] = get_or_set_secret(
             "couchbase_chain_cert",
-            encrypt_text(chain_pem, ctx["secret"]["encoded_salt"])
+            # encrypt_text(chain_pem, ctx["secret"]["encoded_salt"])
+            chain_pem,
         )
 
     # updating couchbase node cert requires couchbase_pkey.key
@@ -337,7 +338,8 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
 
         ctx["secret"]["couchbase_node_key"] = get_or_set_secret(
             "couchbase_node_key",
-            encrypt_text(pkey_key, ctx["secret"]["encoded_salt"])
+            # encrypt_text(pkey_key, ctx["secret"]["encoded_salt"])
+            pkey_key,
         )
 
     # updating couchbase cluster cert requires couchbase_ca.pem
@@ -346,7 +348,8 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
 
         ctx["secret"]["couchbase_cluster_cert"] = get_or_set_secret(
             "couchbase_cluster_cert",
-            encrypt_text(ca_pem, ctx["secret"]["encoded_salt"])
+            # encrypt_text(ca_pem, ctx["secret"]["encoded_salt"])
+            ca_pem,
         )
 
     _, err, retcode = exec_cmd(
@@ -392,6 +395,12 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
 
     ctx["config"]["oxauth_openid_jwks_fn"] = get_or_set_config(
         "oxauth_openid_jwks_fn", "/etc/certs/oxauth-keys.json")
+
+    ctx["config"]["oxauth_legacyIdTokenClaims"] = get_or_set_config(
+        "oxauth_legacyIdTokenClaims", "false")
+
+    ctx["config"]["oxauth_openidScopeBackwardCompatibility"] = get_or_set_config(
+        "oxauth_openidScopeBackwardCompatibility", "true")
 
     ctx["secret"]["oxauth_config_base64"] = get_or_set_secret(
         "oxauth_config_base64",

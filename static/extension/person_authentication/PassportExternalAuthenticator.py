@@ -8,7 +8,6 @@ from org.gluu.jsf2.service import FacesService
 from org.gluu.jsf2.message import FacesMessages
 
 from org.gluu.oxauth.model.common import User, WebKeyStorage
-from org.gluu.oxauth.model.config import ConfigurationFactory
 from org.gluu.oxauth.model.configuration import AppConfiguration
 from org.gluu.oxauth.model.crypto import CryptoProviderFactory
 from org.gluu.oxauth.model.jwt import Jwt, JwtClaimName
@@ -47,6 +46,7 @@ class PersonAuthentication(PersonAuthenticationType):
         if success:
             self.providerKey = "provider"
             self.customAuthzParameter = self.getCustomAuthzParameter(configurationAttributes.get("authz_req_param_provider"))
+            self.passportDN = self.getPassportConfigDN()
             print "Passport. init. Initialization success"
         else:
             print "Passport. init. Initialization failed"
@@ -90,6 +90,9 @@ class PersonAuthentication(PersonAuthenticationType):
                 if not self.validSignature(jwt):
                     return False
 
+                if self.jwtHasExpired(jwt):
+                    return False
+
                 (user_profile, json) = self.getUserProfile(jwt)
                 if user_profile == None:
                     return False
@@ -127,7 +130,7 @@ class PersonAuthentication(PersonAuthenticationType):
             json = identity.getWorkingParameter("passport_user_profile")
 
             if mail == None:
-                self.setEmailMessageError()
+                self.setMessageError(FacesMessage.SEVERITY_ERROR, "Email was missing in user profile")
             elif json != None:
                 # Completion of profile takes place
                 user_profile = self.getProfileFromJson(json)
@@ -207,7 +210,7 @@ class PersonAuthentication(PersonAuthenticationType):
 
     def getPageForStep(self, configurationAttributes, step):
         print "Passport. getPageForStep called"
-        
+
         extensionResult = self.extensionGetPageForStep(configurationAttributes, step)
         if extensionResult != None:
             return extensionResult
@@ -312,28 +315,40 @@ class PersonAuthentication(PersonAuthenticationType):
 
 # Configuration parsing
 
+    def getPassportConfigDN(self):
+
+        f = open('/etc/gluu/conf/gluu.properties', 'r')
+        for line in f:
+            prop = line.split("=")
+            if prop[0] == "oxpassport_ConfigurationEntryDN":
+              prop.pop(0)
+              break
+
+        f.close()
+        return "=".join(prop).strip()
+
+
     def parseAllProviders(self):
 
         registeredProviders = {}
         print "Passport. parseAllProviders. Adding providers"
-        passportDN = CdiUtil.bean(ConfigurationFactory).getPersistenceConfiguration().getConfiguration().getString("oxpassport_ConfigurationEntryDN")
         entryManager = CdiUtil.bean(AppInitializer).createPersistenceEntryManager()
-        
+
         config = LdapOxPassportConfiguration()
-        config = entryManager.find(config.getClass(), passportDN).getPassportConfiguration()
+        config = entryManager.find(config.getClass(), self.passportDN).getPassportConfiguration()
         config = config.getProviders() if config != None else config
-            
-        if config != None and len(config) > 0:      
+
+        if config != None and len(config) > 0:
             for prvdetails in config:
-                if prvdetails.isEnabled():              
-                    registeredProviders[prvdetails.getId()] = {     
-                        "emailLinkingSafe": prvdetails.isEmailLinkingSafe(), 
+                if prvdetails.isEnabled():
+                    registeredProviders[prvdetails.getId()] = {
+                        "emailLinkingSafe": prvdetails.isEmailLinkingSafe(),
                         "requestForEmail" : prvdetails.isRequestForEmail(),
                         "logo_img": prvdetails.getLogoImg(),
                         "displayName": prvdetails.getDisplayName(),
                         "type": prvdetails.getType()
                     }
-        
+
         return registeredProviders
 
 
@@ -343,23 +358,23 @@ class PersonAuthentication(PersonAuthenticationType):
         try:
             registeredProviders = self.parseAllProviders()
             toRemove = []
-            
-            for provider in registeredProviders:                
+
+            for provider in registeredProviders:
                 if registeredProviders[provider]["type"] == "saml":
                     toRemove.append(provider)
                 else:
                     registeredProviders[provider]["saml"] = False
-                
+
             for provider in toRemove:
                 registeredProviders.pop(provider)
-                
+
             if len(registeredProviders.keys()) > 0:
-                print "Passport. parseProviderConfigs. Configured providers:", registeredProviders    
+                print "Passport. parseProviderConfigs. Configured providers:", registeredProviders
             else:
                 print "Passport. parseProviderConfigs. No providers registered yet"
         except:
             print "Passport. parseProviderConfigs. An error occurred while building the list of supported authentication providers", sys.exc_info()[1]
-            
+
         self.registeredProviders = registeredProviders
 
 # Auxiliary routines
@@ -424,6 +439,19 @@ class PersonAuthentication(PersonAuthenticationType):
         return valid
 
 
+    def jwtHasExpired(self, jwt):
+        # Check if jwt has expired
+        jwt_claims = jwt.getClaims()
+        try:
+            exp_date = jwt_claims.getClaimAsDate(JwtClaimName.EXPIRATION_TIME)
+            hasExpired = exp_date < datetime.now()
+        except:
+            print "Exception: The JWT does not have '%s' attribute" % JwtClaimName.EXPIRATION_TIME
+            return False
+
+        return hasExpired
+
+
     def getUserProfile(self, jwt):
         # Check if there is user profile
         jwt_claims = jwt.getClaims()
@@ -447,7 +475,7 @@ class PersonAuthentication(PersonAuthenticationType):
 
     def attemptAuthentication(self, identity, user_profile, user_profile_json):
 
-        uidKey = "uid" 
+        uidKey = "uid"
         if not self.checkRequiredAttributes(user_profile, [uidKey, self.providerKey]):
             return False
 
@@ -500,6 +528,7 @@ class PersonAuthentication(PersonAuthenticationType):
                     doUpdate = True
                 else:
                     print "Users with externalUid '%s' and mail '%s' are different. Access will be denied. Impersonation attempt?" % (externalUid, email)
+                    self.setMessageError(FacesMessage.SEVERITY_ERROR, "Email value corresponds to an already existing provisioned account")
         else:
             if userByMail == None:
                 doAdd = True
@@ -515,6 +544,7 @@ class PersonAuthentication(PersonAuthenticationType):
                 doUpdate = True
             else:
                 print "An attempt to supply an email of an existing user was made. Turn on 'emailLinkingSafe' if you want to enable linking"
+                self.setMessageError(FacesMessage.SEVERITY_ERROR, "Email value corresponds to an already existing account. If you already have a username and password use those instead of an external authentication site to get access.")
 
         username = None
         try:
@@ -540,11 +570,11 @@ class PersonAuthentication(PersonAuthenticationType):
             return logged_in
 
 
-    def setEmailMessageError(self):
+    def setMessageError(self, msg, severity):
         facesMessages = CdiUtil.bean(FacesMessages)
         facesMessages.setKeepMessages()
         facesMessages.clear()
-        facesMessages.add(FacesMessage.SEVERITY_ERROR, "Email was missing in user profile")
+        facesMessages.add(severity, msg)
 
 
     def checkRequiredAttributes(self, profile, attrs):
