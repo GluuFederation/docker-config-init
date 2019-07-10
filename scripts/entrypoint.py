@@ -171,8 +171,7 @@ def generate_pkcs12(suffix, passwd, hostname):
     assert retcode == 0, "Failed to generate PKCS12 file; reason={}".format(err)
 
 
-def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
-                 city, ldap_type="opendj", persistence_type="ldap"):
+def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     """Generates config and secret contexts.
     """
     ctx = {"config": {}, "secret": {}}
@@ -207,12 +206,6 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state,
     ctx["config"]["jetty_base"] = get_or_set_config("jetty_base", "/opt/gluu/jetty")
 
     ctx["config"]["fido2ConfigFolder"] = get_or_set_config("fido2ConfigFolder", "/etc/gluu/conf/fido2")
-
-    # ==========
-    # DB BACKEND
-    # ==========
-    ctx["config"]["ldap_type"] = get_or_set_config("ldap_type", ldap_type)
-    ctx["config"]["persistence_type"] = get_or_set_config("persistence_type", persistence_type)
 
     # ======
     # OpenDJ
@@ -1089,18 +1082,6 @@ def cli():
     pass
 
 
-LDAP_TYPES = [
-    "opendj",
-    "couchbase",
-]
-
-PERSISTENCE_TYPES = [
-    "ldap",
-    "couchbase",
-    # "hybrid",
-]
-
-
 @cli.command()
 @click.option("--admin-pw", required=True, help="Password for admin access.")
 @click.option("--email", required=True, help="Email for support.")
@@ -1109,10 +1090,7 @@ PERSISTENCE_TYPES = [
 @click.option("--country-code", required=True, help="Country code.", callback=validate_country_code)
 @click.option("--state", required=True, help="State.")
 @click.option("--city", required=True, help="City.")
-@click.option("--ldap-type", default="opendj", type=click.Choice(LDAP_TYPES), help="LDAP choice")
-@click.option("--persistence-type", default="ldap", type=click.Choice(PERSISTENCE_TYPES), help="Persistence choice")
-def generate(admin_pw, email, domain, org_name, country_code, state, city,
-             ldap_type, persistence_type):
+def generate(admin_pw, email, domain, org_name, country_code, state, city):
     """Generates initial config and secret and save them into KV.
     """
     def _save_generated_ctx(ctx_manager, filepath, data):
@@ -1133,8 +1111,7 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city,
     click.echo("Generating config and secret.")
     # tolerancy before checking existing key
     time.sleep(5)
-    ctx = generate_ctx(admin_pw, email, domain, org_name, country_code,
-                       state, city, ldap_type, persistence_type)
+    ctx = generate_ctx(admin_pw, email, domain, org_name, country_code, state, city)
 
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
