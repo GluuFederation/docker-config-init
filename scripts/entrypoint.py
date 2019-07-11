@@ -818,13 +818,13 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
         ctx["secret"]["idp3EncryptionKeyText"] = get_or_set_secret(
             "idp3EncryptionKeyText", f.read())
 
-    gen_idp3_key(ctx["secret"]["shibJksPass"])
+    # gen_idp3_key(ctx["secret"]["shibJksPass"])
 
-    with open("/etc/certs/sealer.jks") as f:
-        ctx["secret"]["sealer_jks_base64"] = get_or_set_secret(
-            "sealer_jks_base64",
-            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
-        )
+    # with open("/etc/certs/sealer.jks") as f:
+    #     ctx["secret"]["sealer_jks_base64"] = get_or_set_secret(
+    #         "sealer_jks_base64",
+    #         encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+    #     )
 
     # ==============
     # oxTrust API RS
@@ -1006,11 +1006,11 @@ def generate_keystore(suffix, domain, keypasswd):
     assert retcode == 0, "Failed to generate JKS keystore; reason={}".format(err)
 
 
-def gen_idp3_key(shibJksPass):
-    out, err, retcode = exec_cmd("java -classpath /opt/config-init/javalibs/idp3_cml_keygenerator.jar "
-                                 "'org.gluu.oxshibboleth.keygenerator.KeyGenerator' "
-                                 "/etc/certs {}".format(shibJksPass))
-    return out, err, retcode
+# def gen_idp3_key(shibJksPass):
+#     out, err, retcode = exec_cmd("java -classpath /opt/config-init/javalibs/idp3_cml_keygenerator.jar "
+#                                  "'org.gluu.oxshibboleth.keygenerator.KeyGenerator' "
+#                                  "/etc/certs {}".format(shibJksPass))
+#     return out, err, retcode
 
 
 def _get_or_set(key, value, ctx_manager):
