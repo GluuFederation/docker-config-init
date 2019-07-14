@@ -1,21 +1,25 @@
-import base64
 import hashlib
 import json
+import logging.config
 import os
 import random
 import re
-import shlex
 import string
-import subprocess
 import time
 import uuid
 from functools import partial
 
 import click
-import pyDes
 
-from gluulib import get_manager
-from wait_for import wait_for
+from pygluu.containerlib import get_manager
+from pygluu.containerlib import wait_for
+from pygluu.containerlib.utils import get_random_chars
+from pygluu.containerlib.utils import get_sys_random_chars
+from pygluu.containerlib.utils import encode_text
+from pygluu.containerlib.utils import exec_cmd
+from pygluu.containerlib.utils import as_boolean
+
+from settings import LOGGING_CONFIG
 
 
 # Default charset
@@ -29,13 +33,10 @@ ENC_KEYS = "RSA_OAEP RSA1_5"
 CONFIG_FILEPATH = "/opt/config-init/db/config.json"
 SECRET_FILEPATH = "/opt/config-init/db/secret.json"
 
+logging.config.dictConfig(LOGGING_CONFIG)
+logger = logging.getLogger("entrypoint")
+
 manager = get_manager()
-
-
-def get_random_chars(size=12, chars=_DEFAULT_CHARS):
-    """Generates random characters.
-    """
-    return ''.join(random.choice(chars) for _ in range(size))
 
 
 def ldap_encode(password):
@@ -47,19 +48,6 @@ def ldap_encode(password):
     b64encoded = '{0}{1}'.format(sha.digest(), salt).encode('base64').strip()
     encrypted_password = '{{SSHA}}{0}'.format(b64encoded)
     return encrypted_password
-
-
-def get_quad():
-    # borrowed from community-edition-setup project
-    # see http://git.io/he1p
-    return str(uuid.uuid4())[:4].upper()
-
-
-def encrypt_text(text, key):
-    cipher = pyDes.triple_des(b"{}".format(key), pyDes.ECB,
-                              padmode=pyDes.PAD_PKCS5)
-    encrypted_text = cipher.encrypt(b"{}".format(text))
-    return base64.b64encode(encrypted_text)
 
 
 def reindent(text, num_spaces=1):
@@ -82,16 +70,6 @@ def generate_base64_contents(text, num_spaces=1):
     return text
 
 
-def get_sys_random_chars(size=12, chars=_DEFAULT_CHARS):
-    """Generates random characters based on OS.
-    """
-    return ''.join(random.SystemRandom().choice(chars) for _ in range(size))
-
-
-def join_quad_str(x):
-    return ".".join([get_quad() for _ in xrange(x)])
-
-
 def encode_template(fn, ctx, base_dir="/opt/config-init/templates"):
     path = os.path.join(base_dir, fn)
     # ctx is nested which has `config` and `secret` keys
@@ -100,17 +78,6 @@ def encode_template(fn, ctx, base_dir="/opt/config-init/templates"):
         data.update(v)
     with open(path) as f:
         return generate_base64_contents(safe_render(f.read(), data))
-
-
-def exec_cmd(cmd):
-    args = shlex.split(cmd)
-    popen = subprocess.Popen(args,
-                             stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-    stdout, stderr = popen.communicate()
-    retcode = popen.returncode
-    return stdout, stderr, retcode
 
 
 def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
@@ -213,7 +180,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     ctx["secret"]["encoded_ldap_pw"] = get_or_set_secret("encoded_ldap_pw", ldap_encode(admin_pw))
 
     ctx["secret"]["encoded_ox_ldap_pw"] = get_or_set_secret(
-        "encoded_ox_ldap_pw", encrypt_text(admin_pw, ctx["secret"]["encoded_salt"]),
+        "encoded_ox_ldap_pw", encode_text(admin_pw, ctx["secret"]["encoded_salt"]),
     )
 
     ctx["config"]["ldap_init_host"] = get_or_set_config("ldap_init_host", "localhost")
@@ -250,7 +217,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
             ctx["secret"]["ldap_ssl_cert"] = get_or_set_secret(
                 "ldap_ssl_cert",
-                encrypt_text(ldap_ssl_cert, ctx["secret"]["encoded_salt"]),
+                encode_text(ldap_ssl_cert, ctx["secret"]["encoded_salt"]),
             )
 
         with open("/etc/certs/opendj.key") as fr:
@@ -258,7 +225,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
             ctx["secret"]["ldap_ssl_key"] = get_or_set_secret(
                 "ldap_ssl_key",
-                encrypt_text(ldap_ssl_key, ctx["secret"]["encoded_salt"]),
+                encode_text(ldap_ssl_key, ctx["secret"]["encoded_salt"]),
             )
 
         ldap_ssl_cacert = "".join([ldap_ssl_cert, ldap_ssl_key])
@@ -266,7 +233,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
         ctx["secret"]["ldap_ssl_cacert"] = get_or_set_secret(
             "ldap_ssl_cacert",
-            encrypt_text(ldap_ssl_cacert, ctx["secret"]["encoded_salt"]),
+            encode_text(ldap_ssl_cacert, ctx["secret"]["encoded_salt"]),
         )
 
     generate_pkcs12(
@@ -277,12 +244,12 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     with open(ctx["config"]["ldapTrustStoreFn"], "rb") as fr:
         ctx["secret"]["ldap_pkcs12_base64"] = get_or_set_secret(
             "ldap_pkcs12_base64",
-            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
         )
 
     ctx["secret"]["encoded_ldapTrustStorePass"] = get_or_set_secret(
         "encoded_ldapTrustStorePass",
-        encrypt_text(ctx["secret"]["ldap_truststore_pass"], ctx["secret"]["encoded_salt"]),
+        encode_text(ctx["secret"]["ldap_truststore_pass"], ctx["secret"]["encoded_salt"]),
     )
 
     # =========
@@ -303,7 +270,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
     ctx["secret"]["encoded_couchbaseTrustStorePass"] = get_or_set_secret(
         "encoded_couchbaseTrustStorePass",
-        encrypt_text(ctx["secret"]["couchbase_truststore_pass"], ctx["secret"]["encoded_salt"]),
+        encode_text(ctx["secret"]["couchbase_truststore_pass"], ctx["secret"]["encoded_salt"]),
     )
 
     generate_couchbase_certs(country_code, state, city, org_name, domain, email)
@@ -321,7 +288,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
         # updating couchbase node cert requires couchbase_chain.pem
         ctx["secret"]["couchbase_chain_cert"] = get_or_set_secret(
             "couchbase_chain_cert",
-            # encrypt_text(chain_pem, ctx["secret"]["encoded_salt"])
+            # encode_text(chain_pem, ctx["secret"]["encoded_salt"])
             chain_pem,
         )
 
@@ -331,7 +298,6 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
         ctx["secret"]["couchbase_node_key"] = get_or_set_secret(
             "couchbase_node_key",
-            # encrypt_text(pkey_key, ctx["secret"]["encoded_salt"])
             pkey_key,
         )
 
@@ -341,7 +307,6 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
         ctx["secret"]["couchbase_cluster_cert"] = get_or_set_secret(
             "couchbase_cluster_cert",
-            # encrypt_text(ca_pem, ctx["secret"]["encoded_salt"])
             ca_pem,
         )
 
@@ -364,7 +329,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     with open(ctx["config"]["couchbaseTrustStoreFn"], "rb") as fr:
         ctx["secret"]["couchbase_pkcs12_base64"] = get_or_set_secret(
             "couchbase_pkcs12_base64",
-            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
         )
 
     # ======
@@ -377,7 +342,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
     ctx["secret"]["oxauthClient_encoded_pw"] = get_or_set_secret(
         "oxauthClient_encoded_pw",
-        encrypt_text(get_random_chars(), ctx["secret"]["encoded_salt"]),
+        encode_text(get_random_chars(), ctx["secret"]["encoded_salt"]),
     )
 
     ctx["config"]["oxauth_openid_jks_fn"] = get_or_set_config(
@@ -433,7 +398,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     with open(ctx["config"]["oxauth_openid_jks_fn"], "rb") as fr:
         ctx["secret"]["oxauth_jks_base64"] = get_or_set_secret(
             "oxauth_jks_base64",
-            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"])
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
         )
 
     # =======
@@ -455,7 +420,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
     ctx["secret"]["scim_rs_client_jks_pass_encoded"] = get_or_set_secret(
         "scim_rs_client_jks_pass_encoded",
-        encrypt_text(ctx["secret"]["scim_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+        encode_text(ctx["secret"]["scim_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
     generate_openid_keys(
@@ -474,7 +439,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     with open(ctx["config"]["scim_rs_client_jks_fn"], "rb") as fr:
         ctx["secret"]["scim_rs_jks_base64"] = get_or_set_secret(
             "scim_rs_jks_base64",
-            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
         )
 
     # =======
@@ -496,7 +461,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
     ctx["secret"]["scim_rp_client_jks_pass_encoded"] = get_or_set_secret(
         "scim_rp_client_jks_pass_encoded",
-        encrypt_text(ctx["secret"]["scim_rp_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+        encode_text(ctx["secret"]["scim_rp_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
     generate_openid_keys(
@@ -515,7 +480,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     with open(ctx["config"]["scim_rp_client_jks_fn"], "rb") as fr:
         ctx["secret"]["scim_rp_jks_base64"] = get_or_set_secret(
             "scim_rp_jks_base64",
-            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
         )
 
     ctx["config"]["scim_resource_oxid"] = get_or_set_config(
@@ -542,7 +507,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
     ctx["secret"]["passport_rs_client_jks_pass_encoded"] = get_or_set_secret(
         "passport_rs_client_jks_pass_encoded",
-        encrypt_text(ctx["secret"]["passport_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+        encode_text(ctx["secret"]["passport_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
     generate_openid_keys(
@@ -561,7 +526,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     with open(ctx["config"]["passport_rs_client_jks_fn"], "rb") as fr:
         ctx["secret"]["passport_rs_jks_base64"] = get_or_set_secret(
             "passport_rs_jks_base64",
-            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"])
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
         )
 
     ctx["config"]["passport_resource_id"] = get_or_set_config(
@@ -619,13 +584,13 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     with open(ctx["config"]["passport_rp_client_jks_fn"], "rb") as fr:
         ctx["secret"]["passport_rp_jks_base64"] = get_or_set_secret(
             "passport_rp_jks_base64",
-            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
         )
 
     with open(ctx["config"]["passport_rp_client_cert_fn"]) as fr:
         ctx["secret"]["passport_rp_client_cert_base64"] = get_or_set_secret(
             "passport_rp_client_cert_base64",
-            encrypt_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
         )
 
     # ===========
@@ -657,13 +622,13 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     with open(ctx["config"]["passportSpTLSCert"]) as f:
         ctx["secret"]["passport_sp_cert_base64"] = get_or_set_secret(
             "passport_sp_cert_base64",
-            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+            encode_text(f.read(), ctx["secret"]["encoded_salt"])
         )
 
     with open(ctx["config"]["passportSpTLSKey"]) as f:
         ctx["secret"]["passport_sp_key_base64"] = get_or_set_secret(
             "passport_sp_key_base64",
-            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+            encode_text(f.read(), ctx["secret"]["encoded_salt"])
         )
 
     ctx["secret"]["passport_central_config_base64"] = get_or_set_secret(
@@ -720,7 +685,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
     ctx["secret"]["idpClient_encoded_pw"] = get_or_set_secret(
         "idpClient_encoded_pw",
-        encrypt_text(get_random_chars(), ctx["secret"]["encoded_salt"]),
+        encode_text(get_random_chars(), ctx["secret"]["encoded_salt"]),
     )
 
     ctx["secret"]["oxidp_config_base64"] = get_or_set_secret(
@@ -734,7 +699,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
     ctx["secret"]["encoded_shib_jks_pw"] = get_or_set_secret(
         "encoded_shib_jks_pw",
-        encrypt_text(ctx["secret"]["shibJksPass"], ctx["secret"]["encoded_salt"])
+        encode_text(ctx["secret"]["shibJksPass"], ctx["secret"]["encoded_salt"])
     )
 
     generate_ssl_certkey(
@@ -753,19 +718,19 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     with open("/etc/certs/shibIDP.crt") as f:
         ctx["secret"]["shibIDP_cert"] = get_or_set_secret(
             "shibIDP_cert",
-            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+            encode_text(f.read(), ctx["secret"]["encoded_salt"])
         )
 
     with open("/etc/certs/shibIDP.key") as f:
         ctx["secret"]["shibIDP_key"] = get_or_set_secret(
             "shibIDP_key",
-            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+            encode_text(f.read(), ctx["secret"]["encoded_salt"])
         )
 
     with open(ctx["config"]["shibJksFn"]) as f:
         ctx["secret"]["shibIDP_jks_base64"] = get_or_set_secret(
             "shibIDP_jks_base64",
-            encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+            encode_text(f.read(), ctx["secret"]["encoded_salt"])
         )
 
     ctx["config"]["shibboleth_version"] = get_or_set_config("shibboleth_version", "v3")
@@ -823,7 +788,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     # with open("/etc/certs/sealer.jks") as f:
     #     ctx["secret"]["sealer_jks_base64"] = get_or_set_secret(
     #         "sealer_jks_base64",
-    #         encrypt_text(f.read(), ctx["secret"]["encoded_salt"])
+    #         encode_text(f.read(), ctx["secret"]["encoded_salt"])
     #     )
 
     # ==============
@@ -840,7 +805,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     )
     ctx["secret"]["api_rs_client_jks_pass_encoded"] = get_or_set_secret(
         "api_rs_client_jks_pass_encoded",
-        encrypt_text(ctx["secret"]["api_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+        encode_text(ctx["secret"]["api_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
     generate_openid_keys(
         ctx["secret"]["api_rs_client_jks_pass"],
@@ -877,7 +842,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     )
     ctx["secret"]["api_rp_client_jks_pass_encoded"] = get_or_set_secret(
         "api_rp_client_jks_pass_encoded",
-        encrypt_text(ctx["secret"]["api_rp_client_jks_pass"], ctx["secret"]["encoded_salt"]),
+        encode_text(ctx["secret"]["api_rp_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
     generate_openid_keys(
         ctx["secret"]["api_rp_client_jks_pass"],
@@ -1016,17 +981,16 @@ def generate_keystore(suffix, domain, keypasswd):
 def _get_or_set(key, value, ctx_manager):
     overwrite_all = as_boolean(os.environ.get("GLUU_OVERWRITE_ALL", False))
     if overwrite_all:
-        click.echo("  updating {} {!r}".format(ctx_manager.adapter.type, key))
-        # ctx_manager.set(key, value)
+        logger.info("updating {} {!r}".format(ctx_manager.adapter.type, key))
         return value
 
     # check existing value first
     _value = ctx_manager.get(key)
     if _value:
-        click.echo("  ignoring {} {!r}".format(ctx_manager.adapter.type, key))
+        logger.info("ignoring {} {!r}".format(ctx_manager.adapter.type, key))
         return _value
 
-    click.echo("  adding {} {!r}".format(ctx_manager.adapter.type, key))
+    logger.info("adding {} {!r}".format(ctx_manager.adapter.type, key))
     return value
 
 
@@ -1061,17 +1025,6 @@ def gen_export_openid_keys(jks_pass, jks_fn, jwks_fn, dn, cert_alg, cert_fn):
     return cert_alias
 
 
-def as_boolean(val, default=False):
-    truthy = set(('t', 'T', 'true', 'True', 'TRUE', '1', 1, True))
-    falsy = set(('f', 'F', 'false', 'False', 'FALSE', '0', 0, False))
-
-    if val in truthy:
-        return True
-    if val in falsy:
-        return False
-    return default
-
-
 # ============
 # CLI commands
 # ============
@@ -1094,21 +1047,21 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city):
     """Generates initial config and secret and save them into KV.
     """
     def _save_generated_ctx(ctx_manager, filepath, data):
-        click.echo("Saving {} to backend.".format(ctx_manager.adapter.type))
+        logger.info("Saving {} to backend.".format(ctx_manager.adapter.type))
 
         for k, v in data.iteritems():
             ctx_manager.set(k, v)
 
-        click.echo("Saving {} to {}.".format(ctx_manager.adapter.type, filepath))
+        logger.info("Saving {} to {}.".format(ctx_manager.adapter.type, filepath))
         data = {"_{}".format(ctx_manager.adapter.type): data}
         data = json.dumps(data, indent=4)
 
         with open(filepath, "w") as f:
             f.write(data)
 
-    wait_for(manager)
+    wait_for(manager, deps=["config", "secret"], **{"conn_only": True})
 
-    click.echo("Generating config and secret.")
+    logger.info("Generating config and secret.")
     # tolerancy before checking existing key
     time.sleep(5)
     ctx = generate_ctx(admin_pw, email, domain, org_name, country_code, state, city)
@@ -1126,14 +1079,14 @@ def load():
     """Loads config and secret from JSON file and save them into KV.
     """
     def _load_from_file(ctx_manager, filepath):
-        click.echo("Loading {} from {}.".format(
+        logger.info("Loading {} from {}.".format(
             ctx_manager.adapter.type, filepath))
 
         with open(filepath, "r") as f:
             data = json.loads(f.read())
 
         if "_{}".format(ctx_manager.adapter.type) not in data:
-            click.echo("Missing '_{}' key.".format(ctx_manager.adapter.type))
+            logger.warn("Missing '_{}' key.".format(ctx_manager.adapter.type))
             return
 
         # tolerancy before checking existing key
@@ -1142,7 +1095,7 @@ def load():
             v = _get_or_set(k, v, ctx_manager)
             ctx_manager.set(k, v)
 
-    wait_for(manager)
+    wait_for(manager, deps=["config", "secret"], **{"conn_only": True})
 
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
@@ -1157,7 +1110,7 @@ def dump():
     """Dumps config and secret from KV and save them into JSON file.
     """
     def _dump_to_file(ctx_manager, filepath):
-        click.echo("Saving {} to {}.".format(
+        logger.info("Saving {} to {}.".format(
             ctx_manager.adapter.type, filepath))
 
         data = {"_{}".format(ctx_manager.adapter.type): ctx_manager.all()}
@@ -1165,7 +1118,7 @@ def dump():
         with open(filepath, "w") as f:
             f.write(data)
 
-    wait_for(manager)
+    wait_for(manager, deps=["config", "secret"], **{"conn_only": True})
 
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
@@ -1235,13 +1188,13 @@ def migrate(overwrite, prune):
         'sealer_jks_base64',
     )
 
-    wait_for(manager)
+    wait_for(manager, deps=["config", "secret"], **{"conn_only": True})
 
     if overwrite:
-        click.echo("overwrite mode is enabled")
+        logger.warn("overwrite mode is enabled")
 
     if prune:
-        click.echo("prune mode is enabled")
+        logger.warn("prune mode is enabled")
 
     for k, v in manager.config.all().iteritems():
         if k not in SECRET_KEYS or not v:
@@ -1252,13 +1205,13 @@ def migrate(overwrite, prune):
         # in secret backend, we need to use low-level API
         # (using `secret.adapter.get` instead of `secret.get`)
         if overwrite or not manager.secret.adapter.get(k):
-            click.echo("migrating {} from config to secret backend".format(k))
+            logger.info("migrating {} from config to secret backend".format(k))
             manager.secret.set(k, v)
 
         # if key must be removed from config, then delete it
         # (only if it has been migrated)
         if prune and manager.secret.adapter.get(k):
-            click.echo("deleting {} from config".format(k))
+            logger.info("deleting {} from config".format(k))
             manager.config.delete(k)
 
 

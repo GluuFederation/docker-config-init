@@ -1,4 +1,5 @@
 FROM openjdk:8-jre-alpine3.9
+
 LABEL maintainer="Gluu Inc. <support@gluu.org>"
 
 # ===============
@@ -9,7 +10,8 @@ RUN apk update && apk add --no-cache \
     openssl \
     py-pip \
     shadow \
-    wget
+    wget \
+    git
 
 # ====
 # Java
