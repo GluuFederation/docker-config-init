@@ -3,8 +3,6 @@ import json
 import logging.config
 import os
 import random
-import re
-import string
 import time
 import uuid
 from functools import partial
@@ -18,14 +16,10 @@ from pygluu.containerlib.utils import get_sys_random_chars
 from pygluu.containerlib.utils import encode_text
 from pygluu.containerlib.utils import exec_cmd
 from pygluu.containerlib.utils import as_boolean
+from pygluu.containerlib.utils import generate_base64_contents
+from pygluu.containerlib.utils import safe_render
 
 from settings import LOGGING_CONFIG
-
-
-# Default charset
-_DEFAULT_CHARS = "".join([string.ascii_uppercase,
-                          string.digits,
-                          string.lowercase])
 
 SIG_KEYS = "RS256 RS384 RS512 ES256 ES384 ES512"
 ENC_KEYS = "RSA_OAEP RSA1_5"
@@ -48,26 +42,6 @@ def ldap_encode(password):
     b64encoded = '{0}{1}'.format(sha.digest(), salt).encode('base64').strip()
     encrypted_password = '{{SSHA}}{0}'.format(b64encoded)
     return encrypted_password
-
-
-def reindent(text, num_spaces=1):
-    text = [(num_spaces * " ") + line.lstrip() for line in text.splitlines()]
-    text = "\n".join(text)
-    return text
-
-
-def safe_render(text, ctx):
-    text = re.sub(r"%([^\(])", r"%%\1", text)
-    # There was a % at the end?
-    text = re.sub(r"%$", r"%%", text)
-    return text % ctx
-
-
-def generate_base64_contents(text, num_spaces=1):
-    text = text.encode("base64").strip()
-    if num_spaces > 0:
-        text = reindent(text, num_spaces)
-    return text
 
 
 def encode_template(fn, ctx, base_dir="/opt/config-init/templates"):
@@ -288,7 +262,6 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
         # updating couchbase node cert requires couchbase_chain.pem
         ctx["secret"]["couchbase_chain_cert"] = get_or_set_secret(
             "couchbase_chain_cert",
-            # encode_text(chain_pem, ctx["secret"]["encoded_salt"])
             chain_pem,
         )
 
@@ -1059,7 +1032,8 @@ def generate(admin_pw, email, domain, org_name, country_code, state, city):
         with open(filepath, "w") as f:
             f.write(data)
 
-    wait_for(manager, deps=["config", "secret"], **{"conn_only": True})
+    deps = ["config", "secret"]
+    wait_for(manager, deps=deps, conn_only=deps)
 
     logger.info("Generating config and secret.")
     # tolerancy before checking existing key
@@ -1095,7 +1069,8 @@ def load():
             v = _get_or_set(k, v, ctx_manager)
             ctx_manager.set(k, v)
 
-    wait_for(manager, deps=["config", "secret"], **{"conn_only": True})
+    deps = ["config", "secret"]
+    wait_for(manager, deps=deps, conn_only=deps)
 
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
@@ -1118,7 +1093,8 @@ def dump():
         with open(filepath, "w") as f:
             f.write(data)
 
-    wait_for(manager, deps=["config", "secret"], **{"conn_only": True})
+    deps = ["config", "secret"]
+    wait_for(manager, deps=deps, conn_only=deps)
 
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
@@ -1188,7 +1164,8 @@ def migrate(overwrite, prune):
         'sealer_jks_base64',
     )
 
-    wait_for(manager, deps=["config", "secret"], **{"conn_only": True})
+    deps = ["config", "secret"]
+    wait_for(manager, deps=deps, conn_only=deps)
 
     if overwrite:
         logger.warn("overwrite mode is enabled")

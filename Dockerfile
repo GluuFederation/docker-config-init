@@ -38,10 +38,9 @@ RUN wget -q https://github.com/krallin/tini/releases/download/${TINI_VERSION}/ti
 # Python
 # ======
 
-WORKDIR /opt/config-init
-COPY requirements.txt ./
+COPY requirements.txt /tmp/
 RUN pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r /tmp/requirements.txt
 
 # =======
 # License
