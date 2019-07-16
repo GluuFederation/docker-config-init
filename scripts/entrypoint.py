@@ -26,6 +26,7 @@ ENC_KEYS = "RSA_OAEP RSA1_5"
 
 CONFIG_FILEPATH = "/opt/config-init/db/config.json"
 SECRET_FILEPATH = "/opt/config-init/db/secret.json"
+PARAMS_FILEPATH = "/opt/config-init/db/params.json"
 
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger("entrypoint")
@@ -998,6 +999,122 @@ def gen_export_openid_keys(jks_pass, jks_fn, jwks_fn, dn, cert_alg, cert_fn):
     return cert_alias
 
 
+def _save_generated_ctx(ctx_manager, filepath, data):
+    logger.info("Saving {} to backend.".format(ctx_manager.adapter.type))
+
+    for k, v in data.iteritems():
+        ctx_manager.set(k, v)
+
+    logger.info("Saving {} to {}.".format(ctx_manager.adapter.type, filepath))
+    data = {"_{}".format(ctx_manager.adapter.type): data}
+    data = json.dumps(data, indent=4)
+
+    with open(filepath, "w") as f:
+        f.write(data)
+
+
+def _load_from_file(ctx_manager, filepath):
+    logger.info("Loading {} from {}.".format(
+        ctx_manager.adapter.type, filepath))
+
+    with open(filepath, "r") as f:
+        data = json.loads(f.read())
+
+    if "_{}".format(ctx_manager.adapter.type) not in data:
+        logger.warn("Missing '_{}' key.".format(ctx_manager.adapter.type))
+        return
+
+    # tolerancy before checking existing key
+    time.sleep(5)
+    for k, v in data["_{}".format(ctx_manager.adapter.type)].iteritems():
+        v = _get_or_set(k, v, ctx_manager)
+        ctx_manager.set(k, v)
+
+
+def _dump_to_file(ctx_manager, filepath):
+    logger.info("Saving {} to {}.".format(
+        ctx_manager.adapter.type, filepath))
+
+    data = {"_{}".format(ctx_manager.adapter.type): ctx_manager.all()}
+    data = json.dumps(data, indent=4)
+    with open(filepath, "w") as f:
+        f.write(data)
+
+
+def generate_couchbase_certs(country_code, state, city, org_name, domain, email):
+    root_ca = "couchbase_ca"
+    intermediate = "couchbase_int"
+    node = "couchbase_pkey"
+
+    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(root_ca))
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(root_ca, err)
+
+    _, err, retcode = exec_cmd(
+        "openssl req -new -x509 -sha256 "
+        "-days 365 "
+        "-key /etc/certs/{0}.key "
+        "-out /etc/certs/{0}.pem "
+        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
+            root_ca, country_code, state, city, org_name, domain, email
+        ),
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(root_ca, err)
+
+    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(intermediate))
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(intermediate, err)
+
+    _, err, retcode = exec_cmd(
+        "openssl req -new "
+        "-key /etc/certs/{0}.key "
+        "-out /etc/certs/{0}.csr "
+        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
+            intermediate, country_code, state, city, org_name, domain, email
+        ),
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(intermediate, err)
+
+    V3_CA_EXT = """subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints = CA:true"""
+    with open("/etc/certs/couchbase_v3_ca.ext", "w") as f:
+        f.write(V3_CA_EXT)
+
+    _, err, retcode = exec_cmd(
+        "openssl x509 -req "
+        "-in /etc/certs/{0}.csr "
+        "-CA /etc/certs/{1}.pem "
+        "-CAkey /etc/certs/{1}.key "
+        "-CAcreateserial -CAserial /etc/certs/{1}.srl "
+        "-extfile /etc/certs/couchbase_v3_ca.ext "
+        "-out /etc/certs/{0}.pem "
+        "-days 365".format(intermediate, root_ca)
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(intermediate, err)
+
+    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(node))
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(node, err)
+
+    _, err, retcode = exec_cmd(
+        "openssl req -new "
+        "-key /etc/certs/{0}.key "
+        "-out /etc/certs/{0}.csr "
+        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
+            node, country_code, state, city, org_name, domain, email
+        ),
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(node, err)
+
+    _, err, retcode = exec_cmd(
+        "openssl x509 -req "
+        "-in /etc/certs/{0}.csr "
+        "-CA /etc/certs/{1}.pem "
+        "-CAkey /etc/certs/{1}.key "
+        "-CAcreateserial -CAserial /etc/certs/{1}.srl "
+        "-out /etc/certs/{0}.pem "
+        "-days 365".format(node, intermediate)
+    )
+    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(node, err)
+
 # ============
 # CLI commands
 # ============
@@ -1016,83 +1133,39 @@ def cli():
 @click.option("--country-code", required=True, help="Country code.", callback=validate_country_code)
 @click.option("--state", required=True, help="State.")
 @click.option("--city", required=True, help="City.")
-def generate(admin_pw, email, domain, org_name, country_code, state, city):
-    """Generates initial config and secret and save them into KV.
+def load(admin_pw, email, domain, org_name, country_code, state, city):
+    """Loads config and secret from JSON files (generate if not exist).
     """
-    def _save_generated_ctx(ctx_manager, filepath, data):
-        logger.info("Saving {} to backend.".format(ctx_manager.adapter.type))
-
-        for k, v in data.iteritems():
-            ctx_manager.set(k, v)
-
-        logger.info("Saving {} to {}.".format(ctx_manager.adapter.type, filepath))
-        data = {"_{}".format(ctx_manager.adapter.type): data}
-        data = json.dumps(data, indent=4)
-
-        with open(filepath, "w") as f:
-            f.write(data)
-
     deps = ["config", "secret"]
     wait_for(manager, deps=deps, conn_only=deps)
-
-    logger.info("Generating config and secret.")
-    # tolerancy before checking existing key
-    time.sleep(5)
-    ctx = generate_ctx(admin_pw, email, domain, org_name, country_code, state, city)
 
     wrappers = [
         (manager.config, CONFIG_FILEPATH),
         (manager.secret, SECRET_FILEPATH),
     ]
-    for wrapper in wrappers:
-        _save_generated_ctx(wrapper[0], wrapper[1], ctx[wrapper[0].adapter.type])
 
+    config_file_found = os.path.isfile(CONFIG_FILEPATH)
+    secret_file_found = os.path.isfile(SECRET_FILEPATH)
 
-@cli.command()
-def load():
-    """Loads config and secret from JSON file and save them into KV.
-    """
-    def _load_from_file(ctx_manager, filepath):
-        logger.info("Loading {} from {}.".format(
-            ctx_manager.adapter.type, filepath))
-
-        with open(filepath, "r") as f:
-            data = json.loads(f.read())
-
-        if "_{}".format(ctx_manager.adapter.type) not in data:
-            logger.warn("Missing '_{}' key.".format(ctx_manager.adapter.type))
-            return
-
+    if not any([config_file_found, secret_file_found]):
+        logger.warn("Unable to find {0} or {1}".format(CONFIG_FILEPATH, SECRET_FILEPATH))
+        logger.info("Generating config and secret.")
         # tolerancy before checking existing key
         time.sleep(5)
-        for k, v in data["_{}".format(ctx_manager.adapter.type)].iteritems():
-            v = _get_or_set(k, v, ctx_manager)
-            ctx_manager.set(k, v)
+        ctx = generate_ctx(admin_pw, email, domain, org_name, country_code, state, city)
 
-    deps = ["config", "secret"]
-    wait_for(manager, deps=deps, conn_only=deps)
-
-    wrappers = [
-        (manager.config, CONFIG_FILEPATH),
-        (manager.secret, SECRET_FILEPATH),
-    ]
-    for wrapper in wrappers:
-        _load_from_file(wrapper[0], wrapper[1])
+        for wrapper in wrappers:
+            _save_generated_ctx(wrapper[0], wrapper[1], ctx[wrapper[0].adapter.type])
+    else:
+        for wrapper in wrappers:
+            logger.info("Found {}".format(wrapper[1]))
+            _load_from_file(wrapper[0], wrapper[1])
 
 
 @cli.command()
 def dump():
     """Dumps config and secret from KV and save them into JSON file.
     """
-    def _dump_to_file(ctx_manager, filepath):
-        logger.info("Saving {} to {}.".format(
-            ctx_manager.adapter.type, filepath))
-
-        data = {"_{}".format(ctx_manager.adapter.type): ctx_manager.all()}
-        data = json.dumps(data, indent=4)
-        with open(filepath, "w") as f:
-            f.write(data)
-
     deps = ["config", "secret"]
     wait_for(manager, deps=deps, conn_only=deps)
 
@@ -1190,81 +1263,6 @@ def migrate(overwrite, prune):
         if prune and manager.secret.adapter.get(k):
             logger.info("deleting {} from config".format(k))
             manager.config.delete(k)
-
-
-def generate_couchbase_certs(country_code, state, city, org_name, domain, email):
-    root_ca = "couchbase_ca"
-    intermediate = "couchbase_int"
-    node = "couchbase_pkey"
-
-    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(root_ca))
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(root_ca, err)
-
-    _, err, retcode = exec_cmd(
-        "openssl req -new -x509 -sha256 "
-        "-days 365 "
-        "-key /etc/certs/{0}.key "
-        "-out /etc/certs/{0}.pem "
-        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
-            root_ca, country_code, state, city, org_name, domain, email
-        ),
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(root_ca, err)
-
-    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(intermediate))
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(intermediate, err)
-
-    _, err, retcode = exec_cmd(
-        "openssl req -new "
-        "-key /etc/certs/{0}.key "
-        "-out /etc/certs/{0}.csr "
-        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
-            intermediate, country_code, state, city, org_name, domain, email
-        ),
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(intermediate, err)
-
-    V3_CA_EXT = """subjectKeyIdentifier = hash
-authorityKeyIdentifier = keyid:always,issuer:always
-basicConstraints = CA:true"""
-    with open("/etc/certs/couchbase_v3_ca.ext", "w") as f:
-        f.write(V3_CA_EXT)
-
-    _, err, retcode = exec_cmd(
-        "openssl x509 -req "
-        "-in /etc/certs/{0}.csr "
-        "-CA /etc/certs/{1}.pem "
-        "-CAkey /etc/certs/{1}.key "
-        "-CAcreateserial -CAserial /etc/certs/{1}.srl "
-        "-extfile /etc/certs/couchbase_v3_ca.ext "
-        "-out /etc/certs/{0}.pem "
-        "-days 365".format(intermediate, root_ca)
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(intermediate, err)
-
-    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(node))
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(node, err)
-
-    _, err, retcode = exec_cmd(
-        "openssl req -new "
-        "-key /etc/certs/{0}.key "
-        "-out /etc/certs/{0}.csr "
-        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
-            node, country_code, state, city, org_name, domain, email
-        ),
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(node, err)
-
-    _, err, retcode = exec_cmd(
-        "openssl x509 -req "
-        "-in /etc/certs/{0}.csr "
-        "-CA /etc/certs/{1}.pem "
-        "-CAkey /etc/certs/{1}.key "
-        "-CAcreateserial -CAserial /etc/certs/{1}.srl "
-        "-out /etc/certs/{0}.pem "
-        "-days 365".format(node, intermediate)
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(node, err)
 
 
 if __name__ == "__main__":
