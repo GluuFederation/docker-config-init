@@ -19,14 +19,15 @@ from pygluu.containerlib.utils import as_boolean
 from pygluu.containerlib.utils import generate_base64_contents
 from pygluu.containerlib.utils import safe_render
 
+from parameter import params_from_file
 from settings import LOGGING_CONFIG
 
 SIG_KEYS = "RS256 RS384 RS512 ES256 ES384 ES512"
 ENC_KEYS = "RSA_OAEP RSA1_5"
 
-CONFIG_FILEPATH = "/opt/config-init/db/config.json"
-SECRET_FILEPATH = "/opt/config-init/db/secret.json"
-PARAMS_FILEPATH = "/opt/config-init/db/params.json"
+DEFAULT_CONFIG_FILE = "/opt/config-init/db/config.json"
+DEFAULT_SECRET_FILE = "/opt/config-init/db/secret.json"
+DEFAULT_GENERATE_FILE = "/opt/config-init/db/generate.json"
 
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger("entrypoint")
@@ -113,9 +114,17 @@ def generate_pkcs12(suffix, passwd, hostname):
     assert retcode == 0, "Failed to generate PKCS12 file; reason={}".format(err)
 
 
-def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
+def generate_ctx(params):
     """Generates config and secret contexts.
     """
+    admin_pw = params["admin_pw"]
+    email = params["email"]
+    hostname = params["hostname"]
+    org_name = params["org_name"]
+    country_code = params["country_code"]
+    state = params["state"]
+    city = params["city"]
+
     ctx = {"config": {}, "secret": {}}
 
     ctx["secret"]["encoded_salt"] = get_or_set_secret("encoded_salt", get_random_chars(24))
@@ -128,7 +137,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
 
     ctx["config"]["city"] = get_or_set_config("city", city)
 
-    ctx["config"]["hostname"] = get_or_set_config("hostname", domain)
+    ctx["config"]["hostname"] = get_or_set_config("hostname", hostname)
 
     ctx["config"]["admin_email"] = get_or_set_config("admin_email", email)
 
@@ -248,7 +257,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
         encode_text(ctx["secret"]["couchbase_truststore_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    generate_couchbase_certs(country_code, state, city, org_name, domain, email)
+    generate_couchbase_certs(country_code, state, city, org_name, hostname, email)
 
     with open("/etc/certs/couchbase_chain.pem", "w") as fw:
         with open("/etc/certs/couchbase_pkey.pem") as f:
@@ -292,7 +301,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
         "-storepass {3} "
         "-storetype pkcs12 "
         "-noprompt".format(
-            domain,
+            hostname,
             "/etc/certs/couchbase_ca.pem",
             ctx["config"]["couchbaseTrustStoreFn"],
             couchbase_truststore_pass,
@@ -840,7 +849,7 @@ def generate_ctx(admin_pw, email, domain, org_name, country_code, state, city):
     return ctx
 
 
-def generate_ssl_certkey(suffix, passwd, email, domain, org_name,
+def generate_ssl_certkey(suffix, passwd, email, hostname, org_name,
                          country_code, state, city):
     # create key with password
     _, err, retcode = exec_cmd(" ".join([
@@ -868,7 +877,7 @@ def generate_ssl_certkey(suffix, passwd, email, domain, org_name,
         "-new",
         "-key /etc/certs/{}.key".format(suffix),
         "-out /etc/certs/{}.csr".format(suffix),
-        """-subj /C="{}"/ST="{}"/L="{}"/O="{}"/CN="{}"/emailAddress='{}'""".format(country_code, state, city, org_name, domain, email),
+        """-subj /C="{}"/ST="{}"/L="{}"/O="{}"/CN="{}"/emailAddress='{}'""".format(country_code, state, city, org_name, hostname, email),
 
     ]))
     assert retcode == 0, "Failed to generate SSL CSR; reason={}".format(err)
@@ -913,7 +922,7 @@ def validate_country_code(ctx, param, value):
     return value
 
 
-def generate_keystore(suffix, domain, keypasswd):
+def generate_keystore(suffix, hostname, keypasswd):
     # converts key to pkcs12
     cmd = " ".join([
         "openssl",
@@ -922,7 +931,7 @@ def generate_keystore(suffix, domain, keypasswd):
         "-inkey /etc/certs/{}.key".format(suffix),
         "-in /etc/certs/{}.crt".format(suffix),
         "-out /etc/certs/{}.pkcs12".format(suffix),
-        "-name {}".format(domain),
+        "-name {}".format(hostname),
         "-passout pass:'{}'".format(keypasswd),
     ])
     _, err, retcode = exec_cmd(cmd)
@@ -1041,7 +1050,7 @@ def _dump_to_file(ctx_manager, filepath):
         f.write(data)
 
 
-def generate_couchbase_certs(country_code, state, city, org_name, domain, email):
+def generate_couchbase_certs(country_code, state, city, org_name, hostname, email):
     root_ca = "couchbase_ca"
     intermediate = "couchbase_int"
     node = "couchbase_pkey"
@@ -1055,7 +1064,7 @@ def generate_couchbase_certs(country_code, state, city, org_name, domain, email)
         "-key /etc/certs/{0}.key "
         "-out /etc/certs/{0}.pem "
         """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
-            root_ca, country_code, state, city, org_name, domain, email
+            root_ca, country_code, state, city, org_name, hostname, email
         ),
     )
     assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(root_ca, err)
@@ -1068,7 +1077,7 @@ def generate_couchbase_certs(country_code, state, city, org_name, domain, email)
         "-key /etc/certs/{0}.key "
         "-out /etc/certs/{0}.csr "
         """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
-            intermediate, country_code, state, city, org_name, domain, email
+            intermediate, country_code, state, city, org_name, hostname, email
         ),
     )
     assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(intermediate, err)
@@ -1099,7 +1108,7 @@ basicConstraints = CA:true"""
         "-key /etc/certs/{0}.key "
         "-out /etc/certs/{0}.csr "
         """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
-            node, country_code, state, city, org_name, domain, email
+            node, country_code, state, city, org_name, hostname, email
         ),
     )
     assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(node, err)
@@ -1115,6 +1124,7 @@ basicConstraints = CA:true"""
     )
     assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(node, err)
 
+
 # ============
 # CLI commands
 # ============
@@ -1126,36 +1136,65 @@ def cli():
 
 
 @cli.command()
-@click.option("--admin-pw", required=True, help="Password for admin access.")
-@click.option("--email", required=True, help="Email for support.")
-@click.option("--domain", required=True, help="Domain for Gluu Server.")
-@click.option("--org-name", required=True, help="Organization name.")
-@click.option("--country-code", required=True, help="Country code.", callback=validate_country_code)
-@click.option("--state", required=True, help="State.")
-@click.option("--city", required=True, help="City.")
-def load(admin_pw, email, domain, org_name, country_code, state, city):
+@click.option(
+    "--generate-file",
+    type=click.Path(exists=False),
+    help="Absolute path to file containing parameters for generating config and secret",
+    default=DEFAULT_GENERATE_FILE,
+    show_default=True,
+)
+@click.option(
+    "--config-file",
+    type=click.Path(exists=False),
+    help="Absolute path to file contains config",
+    default=DEFAULT_CONFIG_FILE,
+    show_default=True,
+)
+@click.option(
+    "--secret-file",
+    type=click.Path(exists=False),
+    help="Absolute path to file contains secret",
+    default=DEFAULT_SECRET_FILE,
+    show_default=True,
+)
+def load(generate_file, config_file, secret_file):
     """Loads config and secret from JSON files (generate if not exist).
     """
+    config_file_found = os.path.isfile(config_file)
+    secret_file_found = os.path.isfile(secret_file)
+    should_generate = False
+    params = {}
+
+    if not any([config_file_found, secret_file_found]):
+        should_generate = True
+        logger.warn("Unable to find {0} or {1}".format(config_file, secret_file))
+
+        logger.info("Loading parameters from {}".format(generate_file))
+
+        params, err, code = params_from_file(generate_file)
+        if code != 0:
+            logger.error("Unable to load generate parameters; reason={}".format(err))
+            raise click.Abort()
+
     deps = ["config", "secret"]
     wait_for(manager, deps=deps, conn_only=deps)
 
     wrappers = [
-        (manager.config, CONFIG_FILEPATH),
-        (manager.secret, SECRET_FILEPATH),
+        (manager.config, config_file),
+        (manager.secret, secret_file),
     ]
 
-    config_file_found = os.path.isfile(CONFIG_FILEPATH)
-    secret_file_found = os.path.isfile(SECRET_FILEPATH)
-
-    if not any([config_file_found, secret_file_found]):
-        logger.warn("Unable to find {0} or {1}".format(CONFIG_FILEPATH, SECRET_FILEPATH))
+    if should_generate:
         logger.info("Generating config and secret.")
+
         # tolerancy before checking existing key
         time.sleep(5)
-        ctx = generate_ctx(admin_pw, email, domain, org_name, country_code, state, city)
+
+        ctx = generate_ctx(params)
 
         for wrapper in wrappers:
-            _save_generated_ctx(wrapper[0], wrapper[1], ctx[wrapper[0].adapter.type])
+            data = ctx[wrapper[0].adapter.type]
+            _save_generated_ctx(wrapper[0], wrapper[1], data)
     else:
         for wrapper in wrappers:
             logger.info("Found {}".format(wrapper[1]))
@@ -1163,15 +1202,29 @@ def load(admin_pw, email, domain, org_name, country_code, state, city):
 
 
 @cli.command()
-def dump():
-    """Dumps config and secret from KV and save them into JSON file.
+@click.option(
+    "--config-file",
+    type=click.Path(exists=False),
+    help="Absolute path to file to save config",
+    default=DEFAULT_CONFIG_FILE,
+    show_default=True,
+)
+@click.option(
+    "--secret-file",
+    type=click.Path(exists=False),
+    help="Absolute path to file to save secret",
+    default=DEFAULT_SECRET_FILE,
+    show_default=True,
+)
+def dump(config_file, secret_file):
+    """Dumps config and secret into JSON files.
     """
     deps = ["config", "secret"]
     wait_for(manager, deps=deps, conn_only=deps)
 
     wrappers = [
-        (manager.config, CONFIG_FILEPATH),
-        (manager.secret, SECRET_FILEPATH),
+        (manager.config, config_file),
+        (manager.secret, secret_file),
     ]
     for wrapper in wrappers:
         _dump_to_file(wrapper[0], wrapper[1])
