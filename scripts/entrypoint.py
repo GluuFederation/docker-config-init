@@ -65,6 +65,7 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
 
     cmd = " ".join([
         "java",
+        "-Dlog4j.defaultInitOverride=true",
         "-jar", "/opt/config-init/javalibs/oxauth-client.jar",
         "-enc_keys", ENC_KEYS,
         "-sig_keys", SIG_KEYS,
@@ -75,9 +76,17 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
     ])
     out, err, retcode = exec_cmd(cmd)
     if retcode == 0:
+        # v4 KeyGenerator class returns non JSON-friendly string
+        # the first line is a string of Java WARNING
+        # `WARNING: sun.reflect.Reflection.getCallerClass is not supported.`
+        exploded = out.splitlines()
+        # skip first line if it contains Java WARNING
+        if exploded[0].startswith("WARNING"):
+            del exploded[0]
+        out = "\n".join(exploded)
         with open(jwks_path, "w") as f:
             f.write(out)
-    return out
+    return out, err, retcode
 
 
 def export_openid_keys(keystore, keypasswd, alias, export_file):
@@ -985,7 +994,7 @@ get_or_set_secret = partial(_get_or_set, ctx_manager=manager.secret)
 
 
 def gen_export_openid_keys(jks_pass, jks_fn, jwks_fn, dn, cert_alg, cert_fn):
-    generate_openid_keys(
+    out, err, code = generate_openid_keys(
         jks_pass,
         jks_fn,
         jwks_fn,
