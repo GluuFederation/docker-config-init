@@ -308,10 +308,9 @@ def generate_ctx(params):
         "-file {1} "
         "-keystore {2} "
         "-storepass {3} "
-        "-storetype pkcs12 "
         "-noprompt".format(
             hostname,
-            "/etc/certs/couchbase_ca.pem",
+            "/etc/certs/couchbase_chain.pem",
             ctx["config"]["couchbaseTrustStoreFn"],
             couchbase_truststore_pass,
         )
