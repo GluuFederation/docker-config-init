@@ -57,12 +57,6 @@ def encode_template(fn, ctx, base_dir="/opt/config-init/templates"):
 
 
 def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
-    if os.path.exists(jks_path):
-        os.unlink(jks_path)
-
-    if os.path.exists(jwks_path):
-        os.unlink(jwks_path)
-
     cmd = " ".join([
         "java",
         "-Dlog4j.defaultInitOverride=true",
@@ -76,14 +70,6 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
     ])
     out, err, retcode = exec_cmd(cmd)
     if retcode == 0:
-        # v4 KeyGenerator class returns non JSON-friendly string
-        # the first line is a string of Java WARNING
-        # `WARNING: sun.reflect.Reflection.getCallerClass is not supported.`
-        exploded = out.splitlines()
-        # skip first line if it contains Java WARNING
-        if exploded[0].startswith("WARNING"):
-            del exploded[0]
-        out = "\n".join(exploded)
         with open(jwks_path, "w") as f:
             f.write(out)
     return out, err, retcode
@@ -92,11 +78,12 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
 def export_openid_keys(keystore, keypasswd, alias, export_file):
     cmd = " ".join([
         "java",
+        "-Dlog4j.defaultInitOverride=true",
         "-cp /opt/config-init/javalibs/oxauth-client.jar",
         "org.gluu.oxauth.util.KeyExporter",
         "-keystore {}".format(keystore),
-        "-keypasswd '{}'".format(keypasswd),
-        "-alias '{}'".format(alias),
+        "-keypasswd {}".format(keypasswd),
+        "-alias {}".format(alias),
         "-exportfile {}".format(export_file),
     ])
     return exec_cmd(cmd)
@@ -366,13 +353,16 @@ def generate_ctx(params):
         encode_template("oxauth-errors.json", ctx),
     )
 
-    generate_openid_keys(
+    _, err, retcode = generate_openid_keys(
         ctx["secret"]["oxauth_openid_jks_pass"],
         ctx["config"]["oxauth_openid_jks_fn"],
         ctx["config"]["oxauth_openid_jwks_fn"],
         ctx["config"]["default_openid_jks_dn_name"],
         exp=2,
     )
+    if retcode != 0:
+        logger.error("Unable to generate oxAuth keys; reason={}".format(err))
+        click.Abort()
 
     basedir, fn = os.path.split(ctx["config"]["oxauth_openid_jwks_fn"])
     ctx["secret"]["oxauth_openid_key_base64"] = get_or_set_secret(
@@ -414,12 +404,15 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["scim_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    generate_openid_keys(
+    _, err, retcode = generate_openid_keys(
         ctx["secret"]["scim_rs_client_jks_pass"],
         ctx["config"]["scim_rs_client_jks_fn"],
         ctx["config"]["scim_rs_client_jwks_fn"],
         ctx["config"]["default_openid_jks_dn_name"],
     )
+    if retcode != 0:
+        logger.error("Unable to generate SCIM RS keys; reason={}".format(err))
+        click.Abort()
 
     basedir, fn = os.path.split(ctx["config"]["scim_rs_client_jwks_fn"])
     ctx["secret"]["scim_rs_client_base64_jwks"] = get_or_set_secret(
@@ -455,12 +448,15 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["scim_rp_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    generate_openid_keys(
+    _, err, retcode = generate_openid_keys(
         ctx["secret"]["scim_rp_client_jks_pass"],
         ctx["config"]["scim_rp_client_jks_fn"],
         ctx["config"]["scim_rp_client_jwks_fn"],
         ctx["config"]["default_openid_jks_dn_name"],
     )
+    if retcode != 0:
+        logger.error("Unable to generate SCIM RP keys; reason={}".format(err))
+        click.Abort()
 
     basedir, fn = os.path.split(ctx["config"]["scim_rp_client_jwks_fn"])
     ctx["secret"]["scim_rp_client_base64_jwks"] = get_or_set_secret(
@@ -501,12 +497,15 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["passport_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    generate_openid_keys(
+    _, err, retcode = generate_openid_keys(
         ctx["secret"]["passport_rs_client_jks_pass"],
         ctx["config"]["passport_rs_client_jks_fn"],
         ctx["config"]["passport_rs_client_jwks_fn"],
         ctx["config"]["default_openid_jks_dn_name"],
     )
+    if retcode != 0:
+        logger.error("Unable to generate Passport RS keys; reason={}".format(err))
+        click.Abort()
 
     basedir, fn = os.path.split(ctx["config"]["passport_rs_client_jwks_fn"])
     ctx["secret"]["passport_rs_client_base64_jwks"] = get_or_set_secret(
@@ -553,14 +552,31 @@ def generate_ctx(params):
     ctx["config"]["passport_rp_client_cert_alg"] = get_or_set_config(
         "passport_rp_client_cert_alg", "RS512")
 
-    cert_alias = gen_export_openid_keys(
+    out, err, code = generate_openid_keys(
         ctx["secret"]["passport_rp_client_jks_pass"],
         ctx["config"]["passport_rp_client_jks_fn"],
         ctx["config"]["passport_rp_client_jwks_fn"],
         ctx["config"]["default_openid_jks_dn_name"],
-        ctx["config"]["passport_rp_client_cert_alg"],
+    )
+    if retcode != 0:
+        logger.error("Unable to generate Passport RP keys; reason={}".format(err))
+        click.Abort()
+
+    cert_alias = ""
+    for key in json.loads(out)["keys"]:
+        if key["alg"] == ctx["config"]["passport_rp_client_cert_alg"]:
+            cert_alias = key["kid"]
+            break
+
+    _, err, retcode = export_openid_keys(
+        ctx["config"]["passport_rp_client_jks_fn"],
+        ctx["secret"]["passport_rp_client_jks_pass"],
+        cert_alias,
         ctx["config"]["passport_rp_client_cert_fn"],
     )
+    if retcode != 0:
+        logger.error("Unable to generate Passport RP client cert; reason={}".format(err))
+        click.Abort()
 
     basedir, fn = os.path.split(ctx["config"]["passport_rp_client_jwks_fn"])
     ctx["secret"]["passport_rp_client_base64_jwks"] = get_or_set_secret(
@@ -798,12 +814,16 @@ def generate_ctx(params):
         "api_rs_client_jks_pass_encoded",
         encode_text(ctx["secret"]["api_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
-    generate_openid_keys(
+
+    _, err, retcode = generate_openid_keys(
         ctx["secret"]["api_rs_client_jks_pass"],
         ctx["config"]["api_rs_client_jks_fn"],
         ctx["config"]["api_rs_client_jwks_fn"],
         ctx["config"]["default_openid_jks_dn_name"],
     )
+    if retcode != 0:
+        logger.error("Unable to generate oxTrust API RS keys; reason={}".format(err))
+        click.Abort()
 
     basedir, fn = os.path.split(ctx["config"]["api_rs_client_jwks_fn"])
     ctx["secret"]["api_rs_client_base64_jwks"] = get_or_set_secret(
@@ -835,12 +855,15 @@ def generate_ctx(params):
         "api_rp_client_jks_pass_encoded",
         encode_text(ctx["secret"]["api_rp_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
-    generate_openid_keys(
+    _, err, retcode = generate_openid_keys(
         ctx["secret"]["api_rp_client_jks_pass"],
         ctx["config"]["api_rp_client_jks_fn"],
         ctx["config"]["api_rp_client_jwks_fn"],
         ctx["config"]["default_openid_jks_dn_name"],
     )
+    if retcode != 0:
+        logger.error("Unable to generate oxTrust API RP keys; reason={}".format(err))
+        click.Abort()
 
     basedir, fn = os.path.split(ctx["config"]["api_rp_client_jwks_fn"])
     ctx["secret"]["api_rp_client_base64_jwks"] = get_or_set_secret(
@@ -990,30 +1013,6 @@ get_or_set_config = partial(_get_or_set, ctx_manager=manager.config)
 
 #: Gets value of existing secret or sets a new one
 get_or_set_secret = partial(_get_or_set, ctx_manager=manager.secret)
-
-
-def gen_export_openid_keys(jks_pass, jks_fn, jwks_fn, dn, cert_alg, cert_fn):
-    out, err, code = generate_openid_keys(
-        jks_pass,
-        jks_fn,
-        jwks_fn,
-        dn,
-    )
-
-    with open(jwks_fn, "rb") as fr:
-        pubkey = fr.read()
-        for key in json.loads(pubkey)["keys"]:
-            if key["alg"] == cert_alg:
-                cert_alias = key["kid"]
-                break
-
-    export_openid_keys(
-        jks_fn,
-        jks_pass,
-        cert_alias,
-        cert_fn,
-    )
-    return cert_alias
 
 
 def _save_generated_ctx(ctx_manager, filepath, data):

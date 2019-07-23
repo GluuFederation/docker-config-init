@@ -19,8 +19,8 @@ RUN apk update && apk add --no-cache \
 
 # JAR files required to generate OpenID Connect keys
 ENV OX_VERSION=4.0.b1 \
-    OXAUTH_CLIENT_BUILD_DATE=2019-07-19 \
-    OXSHIBBOLETH_KEYGEN_BUILD_DATE=2019-07-19
+    OXAUTH_CLIENT_BUILD_DATE=2019-07-23 \
+    OXSHIBBOLETH_KEYGEN_BUILD_DATE=2019-07-23
 
 RUN mkdir -p /opt/config-init/javalibs \
     && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/oxauth-client.jar \
