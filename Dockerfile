@@ -23,8 +23,9 @@ ENV OX_VERSION=4.0.b1 \
     OXSHIBBOLETH_KEYGEN_BUILD_DATE=2019-07-23
 
 RUN mkdir -p /opt/config-init/javalibs \
-    && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/oxauth-client.jar \
-    && wget -q https://ox.gluu.org/maven/org/gluu/oxShibbolethKeyGenerator/${OX_VERSION}/oxShibbolethKeyGenerator-${OX_VERSION}.jar -O /opt/config-init/javalibs/idp3_cml_keygenerator.jar
+    && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/oxauth-client.jar
+
+# RUN wget -q https://ox.gluu.org/maven/org/gluu/oxShibbolethKeyGenerator/${OX_VERSION}/oxShibbolethKeyGenerator-${OX_VERSION}.jar -O /opt/config-init/javalibs/idp3_cml_keygenerator.jar
 
 # ====
 # Tini

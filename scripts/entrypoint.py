@@ -333,7 +333,7 @@ def generate_ctx(params):
         "oxauth_openid_jwks_fn", "/etc/certs/oxauth-keys.json")
 
     ctx["config"]["oxauth_legacyIdTokenClaims"] = get_or_set_config(
-        "oxauth_legacyIdTokenClaims", "false")
+        "oxauth_legacyIdTokenClaims", "true")
 
     ctx["config"]["oxauth_openidScopeBackwardCompatibility"] = get_or_set_config(
         "oxauth_openidScopeBackwardCompatibility", "true")
@@ -875,6 +875,61 @@ def generate_ctx(params):
         "oxtrust_requesting_party_client_id",
         '0008-{}'.format(uuid.uuid4()),
     )
+
+    # ======
+    # Radius
+    # ======
+    ctx["config"]["gluu_radius_client_id"] = get_or_set_config(
+        "gluu_radius_client_id",
+        '0008-{}'.format(uuid.uuid4()),
+    )
+    ctx["config"]["ox_radius_client_id"] = get_or_set_config(
+        "ox_radius_client_id",
+        '0008-{}'.format(uuid.uuid4()),
+    )
+    ctx["secret"]["gluu_ro_encoded_pw"] = get_or_set_secret(
+        "gluu_ro_encoded_pw",
+        encode_text(get_random_chars(), ctx["secret"]["encoded_salt"]),
+    )
+
+    radius_jwt_pass = get_random_chars()
+    ctx["secret"]["radius_jwt_pass"] = get_or_set_secret(
+        "radius_jwt_pass",
+        encode_text(radius_jwt_pass, ctx["secret"]["encoded_salt"]),
+    )
+
+    out, err, code = generate_openid_keys(
+        radius_jwt_pass,
+        "/etc/certs/gluu-radius.jks",
+        "/etc/certs/gluu-radius.keys",
+        ctx["config"]["default_openid_jks_dn_name"],
+    )
+    if retcode != 0:
+        logger.error("Unable to generate Gluu Radius keys; reason={}".format(err))
+        click.Abort()
+
+    for key in json.loads(out)["keys"]:
+        if key["alg"] == "RS512":
+            ctx["config"]["radius_jwt_keyId"] = key["kid"]
+            break
+
+    basedir, fn = os.path.split("/etc/certs/gluu-radius.keys")
+    ctx["secret"]["gluu_ro_client_base64_jwks"] = get_or_set_secret(
+        "gluu_ro_client_base64_jwks",
+        encode_template(fn, ctx, basedir),
+    )
+
+    radius_scripts = [
+        ("super_gluu_ro_session.py", "super_gluu_ro_session_script"),
+        ("super_gluu_ro.py", "super_gluu_ro_script"),
+    ]
+    for script in radius_scripts:
+        fn = "/opt/config-init/static/radius/{}".format(script[0])
+        with open(fn) as f:
+            ctx["config"][script[1]] = get_or_set_config(
+                script[1],
+                generate_base64_contents(f.read())
+            )
 
     # populated config
     return ctx
