@@ -913,6 +913,12 @@ def generate_ctx(params):
             ctx["config"]["radius_jwt_keyId"] = key["kid"]
             break
 
+    with open("/etc/certs/gluu-radius.jks", "rb") as fr:
+        ctx["secret"]["radius_jks_base64"] = get_or_set_secret(
+            "radius_jks_base64",
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
+        )
+
     basedir, fn = os.path.split("/etc/certs/gluu-radius.keys")
     ctx["secret"]["gluu_ro_client_base64_jwks"] = get_or_set_secret(
         "gluu_ro_client_base64_jwks",
