@@ -1356,6 +1356,7 @@ def migrate(overwrite, prune):
         'idp3EncryptionCertificateText',
         'idp3EncryptionKeyText',
         'sealer_jks_base64',
+        "oxauth_jks_base64",
     )
 
     deps = ["config", "secret"]
