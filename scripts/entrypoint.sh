@@ -12,7 +12,7 @@ cat << LICENSE_ACK
 LICENSE_ACK
 
 if [ -f /etc/redhat-release ]; then
-    source scl_source enable python27 && python /opt/config-init/scripts/entrypoint.py "$@"
+    source scl_source enable python27 && python /app/scripts/entrypoint.py "$@"
 else
-    python /opt/config-init/scripts/entrypoint.py "$@"
+    python /app/scripts/entrypoint.py "$@"
 fi

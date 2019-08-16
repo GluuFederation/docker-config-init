@@ -25,9 +25,9 @@ from settings import LOGGING_CONFIG
 SIG_KEYS = "RS256 RS384 RS512 ES256 ES384 ES512"
 ENC_KEYS = "RSA_OAEP RSA1_5"
 
-DEFAULT_CONFIG_FILE = "/opt/config-init/db/config.json"
-DEFAULT_SECRET_FILE = "/opt/config-init/db/secret.json"
-DEFAULT_GENERATE_FILE = "/opt/config-init/db/generate.json"
+DEFAULT_CONFIG_FILE = "/app/db/config.json"
+DEFAULT_SECRET_FILE = "/app/db/secret.json"
+DEFAULT_GENERATE_FILE = "/app/db/generate.json"
 
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger("entrypoint")
@@ -46,7 +46,7 @@ def ldap_encode(password):
     return encrypted_password
 
 
-def encode_template(fn, ctx, base_dir="/opt/config-init/templates"):
+def encode_template(fn, ctx, base_dir="/app/templates"):
     path = os.path.join(base_dir, fn)
     # ctx is nested which has `config` and `secret` keys
     data = {}
@@ -60,7 +60,7 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
     cmd = " ".join([
         "java",
         "-Dlog4j.defaultInitOverride=true",
-        "-jar", "/opt/config-init/javalibs/oxauth-client.jar",
+        "-jar", "/app/javalibs/oxauth-client.jar",
         "-enc_keys", ENC_KEYS,
         "-sig_keys", SIG_KEYS,
         "-dnname", "{!r}".format(dn),
@@ -79,7 +79,7 @@ def export_openid_keys(keystore, keypasswd, alias, export_file):
     cmd = " ".join([
         "java",
         "-Dlog4j.defaultInitOverride=true",
-        "-cp /opt/config-init/javalibs/oxauth-client.jar",
+        "-cp /app/javalibs/oxauth-client.jar",
         "org.gluu.oxauth.util.KeyExporter",
         "-keystore {}".format(keystore),
         "-keypasswd {}".format(keypasswd),
@@ -930,7 +930,7 @@ def generate_ctx(params):
         ("super_gluu_ro.py", "super_gluu_ro_script"),
     ]
     for script in radius_scripts:
-        fn = "/opt/config-init/static/radius/{}".format(script[0])
+        fn = "/app/static/radius/{}".format(script[0])
         with open(fn) as f:
             ctx["config"][script[1]] = get_or_set_config(
                 script[1],
@@ -991,7 +991,7 @@ def generate_ssl_certkey(suffix, passwd, email, hostname, org_name,
            "/etc/certs/{}.key".format(suffix)
 
 
-def get_extension_config(basedir="/opt/config-init/static/extension"):
+def get_extension_config(basedir="/app/static/extension"):
     ctx = {}
     for ext_type in os.listdir(basedir):
         ext_type_dir = os.path.join(basedir, ext_type)
@@ -1047,7 +1047,7 @@ def generate_keystore(suffix, hostname, keypasswd):
 
 
 # def gen_idp3_key(shibJksPass):
-#     out, err, retcode = exec_cmd("java -classpath /opt/config-init/javalibs/idp3_cml_keygenerator.jar "
+#     out, err, retcode = exec_cmd("java -classpath /app/javalibs/idp3_cml_keygenerator.jar "
 #                                  "'org.gluu.oxshibboleth.keygenerator.KeyGenerator' "
 #                                  "/etc/certs {}".format(shibJksPass))
 #     return out, err, retcode

@@ -1,7 +1,5 @@
 FROM openjdk:8-jre-alpine3.9
 
-LABEL maintainer="Gluu Inc. <support@gluu.org>"
-
 # ===============
 # Alpine packages
 # ===============
@@ -13,19 +11,18 @@ RUN apk update && apk add --no-cache \
     wget \
     git
 
-# ====
-# Java
-# ====
+# =============
+# oxAuth client
+# =============
 
 # JAR files required to generate OpenID Connect keys
-ENV OX_VERSION=4.0.b2 \
-    OXAUTH_CLIENT_BUILD_DATE=2019-07-31
+ENV GLUU_VERSION=4.0.b3 \
+    GLUU_BUILD_DATE=2019-08-15
 
-RUN mkdir -p /opt/config-init/javalibs \
-    && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${OX_VERSION}/oxauth-client-${OX_VERSION}-jar-with-dependencies.jar -O /opt/config-init/javalibs/oxauth-client.jar
+RUN mkdir -p /app/javalibs \
+    && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${GLUU_VERSION}/oxauth-client-${GLUU_VERSION}-jar-with-dependencies.jar -O /app/javalibs/oxauth-client.jar
 
-# ENV OXSHIBBOLETH_KEYGEN_BUILD_DATE=2019-07-31
-# RUN wget -q https://ox.gluu.org/maven/org/gluu/oxShibbolethKeyGenerator/${OX_VERSION}/oxShibbolethKeyGenerator-${OX_VERSION}.jar -O /opt/config-init/javalibs/idp3_cml_keygenerator.jar
+# RUN wget -q https://ox.gluu.org/maven/org/gluu/oxShibbolethKeyGenerator/${GLUU_VERSION}/oxShibbolethKeyGenerator-${GLUU_VERSION}.jar -O /app/javalibs/idp3_cml_keygenerator.jar
 
 # ====
 # Tini
@@ -98,23 +95,33 @@ ENV GLUU_OVERWRITE_ALL=false \
 # misc
 # ====
 
-COPY scripts /opt/config-init/scripts
-COPY templates /opt/config-init/templates
-COPY static /opt/config-init/static
+LABEL name="ConfigInit" \
+    maintainer="Gluu Inc. <support@gluu.org>" \
+    vendor="Gluu Federation" \
+    version="4.0.0" \
+    release="dev" \
+    summary="Gluu ConfigInit" \
+    description="Manage config and secret"
 
-RUN mkdir -p /etc/certs /opt/config-init/db
+COPY scripts /app/scripts
+COPY templates /app/templates
+COPY static /app/static
+
+RUN mkdir -p /etc/certs /app/db \
+    && chmod +x /app/scripts/entrypoint.sh \
+    && ln -s /app /opt/config-init
 
 # # create gluu user
 # RUN useradd -ms /bin/sh --uid 1000 gluu \
 #     && usermod -a -G root gluu
 
 # # adjust ownership
-# RUN chown -R 1000:1000 /opt/config-init \
-#     && chgrp -R 0 /opt/config-init && chmod -R g=u /opt/config-init \
+# RUN chown -R 1000:1000 /app \
+#     && chgrp -R 0 /app && chmod -R g=u /app \
 #     && chgrp -R 0 /etc/certs && chmod -R g=u /etc/certs
 
 # # run the entrypoint as gluu user
 # USER 1000
 
-ENTRYPOINT ["tini", "-g", "--", "sh", "/opt/config-init/scripts/entrypoint.sh"]
+ENTRYPOINT ["tini", "-g", "--", "/app/scripts/entrypoint.sh"]
 CMD ["--help"]
