@@ -838,6 +838,11 @@ def generate_ctx(params):
         "oxtrust_resource_id",
         '0008-{}'.format(uuid.uuid4()),
     )
+    with open(ctx["config"]["api_rs_client_jks_fn"], "rb") as fr:
+        ctx["secret"]["api_rs_jks_base64"] = get_or_set_secret(
+            "api_rs_jks_base64",
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
+        )
 
     # ==============
     # oxTrust API RP
@@ -875,6 +880,12 @@ def generate_ctx(params):
         "oxtrust_requesting_party_client_id",
         '0008-{}'.format(uuid.uuid4()),
     )
+
+    with open(ctx["config"]["api_rp_client_jks_fn"], "rb") as fr:
+        ctx["secret"]["api_rp_jks_base64"] = get_or_set_secret(
+            "api_rp_jks_base64",
+            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
+        )
 
     # ======
     # Radius
