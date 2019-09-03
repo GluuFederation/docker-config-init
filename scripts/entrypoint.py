@@ -89,11 +89,6 @@ def export_openid_keys(keystore, keypasswd, alias, export_file):
     return exec_cmd(cmd)
 
 
-def encode_keys_template(jks_pass, jks_fn, jwks_fn, ctx):
-    base_dir, fn = os.path.split(jwks_fn)
-    return encode_template(fn, ctx, base_dir=base_dir)
-
-
 def generate_pkcs12(suffix, passwd, hostname):
     # Convert key to pkcs12
     cmd = " ".join([
@@ -337,21 +332,6 @@ def generate_ctx(params):
 
     ctx["config"]["oxauth_openidScopeBackwardCompatibility"] = get_or_set_config(
         "oxauth_openidScopeBackwardCompatibility", "true")
-
-    ctx["secret"]["oxauth_config_base64"] = get_or_set_secret(
-        "oxauth_config_base64",
-        encode_template("oxauth-config.json", ctx),
-    )
-
-    ctx["config"]["oxauth_static_conf_base64"] = get_or_set_config(
-        "oxauth_static_conf_base64",
-        encode_template("oxauth-static-conf.json", ctx),
-    )
-
-    ctx["config"]["oxauth_error_base64"] = get_or_set_config(
-        "oxauth_error_base64",
-        encode_template("oxauth-errors.json", ctx),
-    )
 
     _, err, retcode = generate_openid_keys(
         ctx["secret"]["oxauth_openid_jks_pass"],
@@ -638,19 +618,6 @@ def generate_ctx(params):
             encode_text(f.read(), ctx["secret"]["encoded_salt"])
         )
 
-    ctx["secret"]["passport_central_config_base64"] = get_or_set_secret(
-        "passport_central_config_base64",
-        encode_template("passport-central-config.json", ctx)
-    )
-
-    # ========
-    # oxAsimba
-    # ========
-    # ctx["secret"]["oxasimba_config_base64"] = get_or_set_secret(
-    #     "oxasimba_config_base64",
-    #     encode_template("oxasimba-config.json", ctx),
-    # )
-
     # ================
     # SSL cert and key
     # ================
@@ -676,12 +643,6 @@ def generate_ctx(params):
     with open(ssl_key) as f:
         ctx["secret"]["ssl_key"] = get_or_set_secret("ssl_key", f.read())
 
-    # ================
-    # Extension config
-    # ================
-    ext_ctx = get_extension_config()
-    ctx["config"].update(ext_ctx)
-
     # ===================
     # IDP3 (oxShibboleth)
     # ===================
@@ -693,11 +654,6 @@ def generate_ctx(params):
     ctx["secret"]["idpClient_encoded_pw"] = get_or_set_secret(
         "idpClient_encoded_pw",
         encode_text(get_random_chars(), ctx["secret"]["encoded_salt"]),
-    )
-
-    ctx["secret"]["oxidp_config_base64"] = get_or_set_secret(
-        "oxidp_config_base64",
-        encode_template("oxidp-config.json", ctx)
     )
 
     ctx["config"]["shibJksFn"] = get_or_set_config("shibJksFn", "/etc/certs/shibIDP.jks")
@@ -936,18 +892,6 @@ def generate_ctx(params):
         encode_template(fn, ctx, basedir),
     )
 
-    radius_scripts = [
-        ("super_gluu_ro_session.py", "super_gluu_ro_session_script"),
-        ("super_gluu_ro.py", "super_gluu_ro_script"),
-    ]
-    for script in radius_scripts:
-        fn = "/app/static/radius/{}".format(script[0])
-        with open(fn) as f:
-            ctx["config"][script[1]] = get_or_set_config(
-                script[1],
-                generate_base64_contents(f.read())
-            )
-
     # populated config
     return ctx
 
@@ -1000,23 +944,6 @@ def generate_ssl_certkey(suffix, passwd, email, hostname, org_name,
     # return the paths
     return "/etc/certs/{}.crt".format(suffix), \
            "/etc/certs/{}.key".format(suffix)
-
-
-def get_extension_config(basedir="/app/static/extension"):
-    ctx = {}
-    for ext_type in os.listdir(basedir):
-        ext_type_dir = os.path.join(basedir, ext_type)
-
-        for fname in os.listdir(ext_type_dir):
-            filepath = os.path.join(ext_type_dir, fname)
-            ext_name = "{}_{}".format(ext_type, os.path.splitext(fname)[0].lower())
-
-            with open(filepath) as fd:
-                ctx[ext_name] = get_or_set_config(
-                    ext_name,
-                    generate_base64_contents(fd.read())
-                )
-    return ctx
 
 
 def validate_country_code(ctx, param, value):
@@ -1331,7 +1258,6 @@ def migrate(overwrite, prune):
         'encoded_ox_replication_pw',
         'oxauthClient_encoded_pw',
         'oxauth_openid_jks_pass',
-        'oxauth_config_base64',
         'oxauth_openid_key_base64',
         'scim_rs_client_jks_pass',
         'scim_rs_client_jks_pass_encoded',
@@ -1356,7 +1282,6 @@ def migrate(overwrite, prune):
         'ssl_cert',
         'ssl_key',
         'idpClient_encoded_pw',
-        'oxidp_config_base64',
         'shibJksPass',
         'encoded_shib_jks_pw',
         'shibIDP_cert',

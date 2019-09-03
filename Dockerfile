@@ -104,8 +104,6 @@ LABEL name="ConfigInit" \
     description="Manage config and secret"
 
 COPY scripts /app/scripts
-COPY templates /app/templates
-COPY static /app/static
 
 RUN mkdir -p /etc/certs /app/db \
     && chmod +x /app/scripts/entrypoint.sh \
