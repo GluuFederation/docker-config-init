@@ -149,6 +149,8 @@ def generate_ctx(params):
 
     ctx["config"]["fido2ConfigFolder"] = get_or_set_config("fido2ConfigFolder", "/etc/gluu/conf/fido2")
 
+    ctx["config"]["admin_inum"] = get_or_set_config("admin_inum", "{}".format(uuid.uuid4()))
+
     # ======
     # OpenDJ
     # ======
