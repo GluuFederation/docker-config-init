@@ -1184,8 +1184,8 @@ def load(generate_file, config_file, secret_file):
             logger.error("Unable to load generate parameters; reason={}".format(err))
             raise click.Abort()
 
-    deps = ["config", "secret"]
-    wait_for(manager, deps=deps, conn_only=deps)
+    deps = ["config_conn", "secret_conn"]
+    wait_for(manager, deps=deps)
 
     wrappers = [
         (manager.config, config_file),
@@ -1227,8 +1227,8 @@ def load(generate_file, config_file, secret_file):
 def dump(config_file, secret_file):
     """Dumps config and secret into JSON files.
     """
-    deps = ["config", "secret"]
-    wait_for(manager, deps=deps, conn_only=deps)
+    deps = ["config_conn", "secret_conn"]
+    wait_for(manager, deps=deps)
 
     wrappers = [
         (manager.config, config_file),
@@ -1297,8 +1297,8 @@ def migrate(overwrite, prune):
         "oxauth_jks_base64",
     )
 
-    deps = ["config", "secret"]
-    wait_for(manager, deps=deps, conn_only=deps)
+    deps = ["config_conn", "secret_conn"]
+    wait_for(manager, deps=deps)
 
     if overwrite:
         logger.warn("overwrite mode is enabled")

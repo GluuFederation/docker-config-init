@@ -4,20 +4,17 @@ FROM openjdk:8-jre-alpine3.9
 # Alpine packages
 # ===============
 
-RUN apk update && apk add --no-cache \
-    openssl \
-    py-pip \
-    shadow \
-    wget \
-    git
+RUN apk update \
+    && apk add --no-cache openssl py-pip shadow \
+    && apk add --no-cache --virtual build-deps wget git
 
 # =============
 # oxAuth client
 # =============
 
 # JAR files required to generate OpenID Connect keys
-ENV GLUU_VERSION=4.0.rc1 \
-    GLUU_BUILD_DATE=2019-09-11
+ENV GLUU_VERSION=4.0.rc2 \
+    GLUU_BUILD_DATE=2019-09-20
 
 RUN mkdir -p /app/javalibs \
     && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${GLUU_VERSION}/oxauth-client-${GLUU_VERSION}-jar-with-dependencies.jar -O /app/javalibs/oxauth-client.jar
@@ -37,8 +34,14 @@ RUN wget -q https://github.com/krallin/tini/releases/download/v0.18.0/tini-stati
 
 COPY requirements.txt /tmp/
 RUN pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir -r /tmp/requirements.txt \
-    && apk del git
+    && pip install --no-cache-dir -r /tmp/requirements.txt
+
+# =======
+# Cleanup
+# =======
+
+RUN apk del build-deps \
+    && rm -rf /var/cache/apk/*
 
 # =======
 # License
