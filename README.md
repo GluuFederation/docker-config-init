@@ -4,4 +4,4 @@ A docker image to generate the necessary configuration required by other docker 
 
 ## Documentation
 
-The official documentation can be found at https://gluu.org/docs/de/3.1.6.
+The official documentation can be found at https://gluu.org/docs/de/4.0/.
