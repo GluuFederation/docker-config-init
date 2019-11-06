@@ -117,8 +117,7 @@ RUN useradd -ms /bin/sh --uid 1000 gluu \
     && usermod -a -G root gluu
 
 # adjust ownership
-RUN chown -R 1000:1000 /app \
-    && chgrp -R 0 /app && chmod -R g=u /app \
+RUN chgrp -R 0 /app && chmod -R g=u /app \
     && chgrp -R 0 /etc/certs && chmod -R g=u /etc/certs
 
 # run the entrypoint as gluu user
