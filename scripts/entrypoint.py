@@ -845,6 +845,18 @@ def generate_ctx(params):
             encode_text(fr.read(), ctx["secret"]["encoded_salt"])
         )
 
+    # =======================
+    # oxTrust API test client
+    # =======================
+    ctx["config"]["api_test_client_id"] = get_or_set_config(
+        "api_test_client_id",
+        "0008-{}".format(uuid.uuid4()),
+    )
+    ctx["secret"]["api_test_client_secret"] = get_or_set_secret(
+        "api_test_client_secret",
+        get_random_chars(24),
+    )
+
     # ======
     # Radius
     # ======
