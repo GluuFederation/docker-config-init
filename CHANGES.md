@@ -2,6 +2,12 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 4.0.1_06
+
+Released on December 27th, 2019.
+
+* Added credentials for SCIM test client.
+
 ## Version 4.0.1_05
 
 Released on December 1st, 2019.
