@@ -906,6 +906,18 @@ def generate_ctx(params):
         encode_template(fn, ctx, basedir),
     )
 
+    # ================
+    # SCIM test client
+    # ================
+    ctx["config"]["scim_test_client_id"] = get_or_set_config(
+        "scim_test_client_id",
+        "0008-{}".format(uuid.uuid4()),
+    )
+    ctx["secret"]["scim_test_client_secret"] = get_or_set_secret(
+        "scim_test_client_secret",
+        get_random_chars(24),
+    )
+
     # populated config
     return ctx
 
