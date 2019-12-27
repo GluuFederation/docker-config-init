@@ -4,10 +4,10 @@ import re
 import cerberus
 
 EMAIL_RGX = re.compile(
-    "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+    r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 )
 PASSWD_RGX = re.compile(
-    "^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*\W)[a-zA-Z0-9\S]{6,}$"
+    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*\W)[a-zA-Z0-9\S]{6,}$"
 )
 
 
@@ -58,6 +58,11 @@ def params_from_file(path):
             "check_with": validate_email,
         },
         "admin_pw": {
+            "type": "string",
+            "required": True,
+            "check_with": validate_admin_pw,
+        },
+        "ldap_pw": {
             "type": "string",
             "required": True,
             "check_with": validate_admin_pw,

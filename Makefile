@@ -1,4 +1,4 @@
-GLUU_VERSION=4.0.1
+GLUU_VERSION=4.1.0
 IMAGE_NAME=gluufederation/config-init
 UNSTABLE_VERSION=dev
 

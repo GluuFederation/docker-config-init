@@ -109,6 +109,7 @@ def generate_ctx(params):
     """Generates config and secret contexts.
     """
     admin_pw = params["admin_pw"]
+    ldap_pw = params["ldap_pw"]
     email = params["email"]
     hostname = params["hostname"]
     org_name = params["org_name"]
@@ -151,13 +152,16 @@ def generate_ctx(params):
 
     ctx["config"]["admin_inum"] = get_or_set_config("admin_inum", "{}".format(uuid.uuid4()))
 
+    ctx["secret"]["encoded_oxtrust_admin_password"] = get_or_set_secret(
+        "encoded_oxtrust_admin_password", ldap_encode(admin_pw))
+
     # ======
     # OpenDJ
     # ======
-    ctx["secret"]["encoded_ldap_pw"] = get_or_set_secret("encoded_ldap_pw", ldap_encode(admin_pw))
+    # ctx["secret"]["encoded_ldap_pw"] = get_or_set_secret("encoded_ldap_pw", ldap_encode(admin_pw))
 
     ctx["secret"]["encoded_ox_ldap_pw"] = get_or_set_secret(
-        "encoded_ox_ldap_pw", encode_text(admin_pw, ctx["secret"]["encoded_salt"]),
+        "encoded_ox_ldap_pw", encode_text(ldap_pw, ctx["secret"]["encoded_salt"]),
     )
 
     ctx["config"]["ldap_init_host"] = get_or_set_config("ldap_init_host", "localhost")
@@ -229,90 +233,12 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["ldap_truststore_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    # =========
-    # Couchbase
-    # =========
-    ctx["config"]["couchbase_server_user"] = "admin"
-
-    ctx["secret"]["encoded_couchbase_server_pw"] = ctx["secret"]["encoded_ox_ldap_pw"]
-    ctx["secret"]["couchbase_shib_user_password"] = get_random_chars()
-
-    # TODO: dynamic
-    couchbase_truststore_pass = "newsecret"
-
-    ctx["secret"]["couchbase_truststore_pass"] = get_or_set_secret(
-        "couchbase_truststore_pass", couchbase_truststore_pass)
-
-    ctx["config"]["couchbaseTrustStoreFn"] = get_or_set_config("couchbaseTrustStoreFn", "/etc/certs/couchbase.pkcs12")
-
-    ctx["secret"]["encoded_couchbaseTrustStorePass"] = get_or_set_secret(
-        "encoded_couchbaseTrustStorePass",
-        encode_text(ctx["secret"]["couchbase_truststore_pass"], ctx["secret"]["encoded_salt"]),
-    )
-
-    generate_couchbase_certs(country_code, state, city, org_name, hostname, email)
-
-    with open("/etc/certs/couchbase_chain.pem", "w") as fw:
-        with open("/etc/certs/couchbase_pkey.pem") as f:
-            node_pem = f.read()
-
-        with open("/etc/certs/couchbase_int.pem") as f:
-            intermediate_pem = f.read()
-
-        chain_pem = "".join([node_pem, intermediate_pem])
-        fw.write(chain_pem)
-
-        # updating couchbase node cert requires couchbase_chain.pem
-        ctx["secret"]["couchbase_chain_cert"] = get_or_set_secret(
-            "couchbase_chain_cert",
-            chain_pem,
-        )
-
-    # updating couchbase node cert requires couchbase_pkey.key
-    with open("/etc/certs/couchbase_pkey.key") as f:
-        pkey_key = f.read()
-
-        ctx["secret"]["couchbase_node_key"] = get_or_set_secret(
-            "couchbase_node_key",
-            pkey_key,
-        )
-
-    # updating couchbase cluster cert requires couchbase_ca.pem
-    with open("/etc/certs/couchbase_ca.pem") as f:
-        ca_pem = f.read()
-
-        ctx["secret"]["couchbase_cluster_cert"] = get_or_set_secret(
-            "couchbase_cluster_cert",
-            ca_pem,
-        )
-
-    _, err, retcode = exec_cmd(
-        "keytool -import -trustcacerts "
-        "-alias {0}_couchbase "
-        "-file {1} "
-        "-keystore {2} "
-        "-storepass {3} "
-        "-noprompt".format(
-            hostname,
-            "/etc/certs/couchbase_chain.pem",
-            ctx["config"]["couchbaseTrustStoreFn"],
-            couchbase_truststore_pass,
-        )
-    )
-    assert retcode == 0, "Failed to generate couchbase.pkcs12; reason={}".format(err)
-
-    with open(ctx["config"]["couchbaseTrustStoreFn"], "rb") as fr:
-        ctx["secret"]["couchbase_pkcs12_base64"] = get_or_set_secret(
-            "couchbase_pkcs12_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
-        )
-
     # ======
     # oxAuth
     # ======
     ctx["config"]["oxauth_client_id"] = get_or_set_config(
         "oxauth_client_id",
-        "0008-{}".format(uuid.uuid4()),
+        "1001.{}".format(uuid.uuid4()),
     )
 
     ctx["secret"]["oxauthClient_encoded_pw"] = get_or_set_secret(
@@ -369,7 +295,7 @@ def generate_ctx(params):
     # =======
     ctx["config"]["scim_rs_client_id"] = get_or_set_config(
         "scim_rs_client_id",
-        "0008-{}".format(uuid.uuid4()),
+        "1201.{}".format(uuid.uuid4()),
     )
 
     ctx["config"]["scim_rs_client_jks_fn"] = get_or_set_config(
@@ -379,7 +305,7 @@ def generate_ctx(params):
         "scim_rs_client_jwks_fn", "/etc/certs/scim-rs-keys.json")
 
     ctx["secret"]["scim_rs_client_jks_pass"] = get_or_set_secret(
-        "scim_rs_client_jks_pass", get_random_chars())
+        "scim_rs_client_jks_pass", "secret")
 
     ctx["secret"]["scim_rs_client_jks_pass_encoded"] = get_or_set_secret(
         "scim_rs_client_jks_pass_encoded",
@@ -413,7 +339,7 @@ def generate_ctx(params):
     # =======
     ctx["config"]["scim_rp_client_id"] = get_or_set_config(
         "scim_rp_client_id",
-        "0008-{}".format(uuid.uuid4()),
+        "1202.{}".format(uuid.uuid4()),
     )
 
     ctx["config"]["scim_rp_client_jks_fn"] = get_or_set_config(
@@ -423,7 +349,7 @@ def generate_ctx(params):
         "scim_rp_client_jwks_fn", "/etc/certs/scim-rp-keys.json")
 
     ctx["secret"]["scim_rp_client_jks_pass"] = get_or_set_secret(
-        "scim_rp_client_jks_pass", get_random_chars())
+        "scim_rp_client_jks_pass", "secret")
 
     ctx["secret"]["scim_rp_client_jks_pass_encoded"] = get_or_set_secret(
         "scim_rp_client_jks_pass_encoded",
@@ -454,7 +380,7 @@ def generate_ctx(params):
 
     ctx["config"]["scim_resource_oxid"] = get_or_set_config(
         "scim_resource_oxid",
-        str(uuid.uuid4()),
+        "1203.".format(uuid.uuid4()),
     )
 
     # ===========
@@ -462,7 +388,7 @@ def generate_ctx(params):
     # ===========
     ctx["config"]["passport_rs_client_id"] = get_or_set_config(
         "passport_rs_client_id",
-        "0008-{}".format(uuid.uuid4()),
+        "1501.{}".format(uuid.uuid4()),
     )
 
     ctx["config"]["passport_rs_client_jks_fn"] = get_or_set_config(
@@ -472,7 +398,7 @@ def generate_ctx(params):
         "passport_rs_client_jwks_fn", "/etc/certs/passport-rs-keys.json")
 
     ctx["secret"]["passport_rs_client_jks_pass"] = get_or_set_secret(
-        "passport_rs_client_jks_pass", get_random_chars())
+        "passport_rs_client_jks_pass", "secret")
 
     ctx["secret"]["passport_rs_client_jks_pass_encoded"] = get_or_set_secret(
         "passport_rs_client_jks_pass_encoded",
@@ -503,7 +429,7 @@ def generate_ctx(params):
 
     ctx["config"]["passport_resource_id"] = get_or_set_config(
         "passport_resource_id",
-        '0008-{}'.format(uuid.uuid4()),
+        '1504.{}'.format(uuid.uuid4()),
     )
 
     # ===========
@@ -511,16 +437,16 @@ def generate_ctx(params):
     # ===========
     ctx["config"]["passport_rp_client_id"] = get_or_set_config(
         "passport_rp_client_id",
-        "0008-{}".format(uuid.uuid4()),
+        "1502.{}".format(uuid.uuid4()),
     )
 
     ctx["config"]["passport_rp_ii_client_id"] = get_or_set_config(
         "passport_rp_ii_client_id",
-        "0008-{}".format(uuid.uuid4()),
+        "1503.{}".format(uuid.uuid4()),
     )
 
     ctx["secret"]["passport_rp_client_jks_pass"] = get_or_set_secret(
-        "passport_rp_client_jks_pass", get_random_chars())
+        "passport_rp_client_jks_pass", "secret")
 
     ctx["config"]["passport_rp_client_jks_fn"] = get_or_set_config(
         "passport_rp_client_jks_fn", "/etc/certs/passport-rp.jks")
@@ -625,12 +551,13 @@ def generate_ctx(params):
     # ================
     ssl_cert = "/etc/certs/gluu_https.crt"
     ssl_key = "/etc/certs/gluu_https.key"
+    ctx["secret"]["ssl_cert_pass"] = get_or_set_secret("ssl_cert_pass", get_random_chars())
 
     # generate self-signed SSL cert and key only if they aren't exist
     if not(os.path.exists(ssl_cert) and os.path.exists(ssl_key)):
         generate_ssl_certkey(
             "gluu_https",
-            admin_pw,
+            ctx["secret"]["ssl_cert_pass"],
             ctx["config"]["admin_email"],
             ctx["config"]["hostname"],
             ctx["config"]["orgName"],
@@ -650,7 +577,7 @@ def generate_ctx(params):
     # ===================
     ctx["config"]["idp_client_id"] = get_or_set_config(
         "idp_client_id",
-        "0008-{}".format(uuid.uuid4()),
+        "1101.{}".format(uuid.uuid4()),
     )
 
     ctx["secret"]["idpClient_encoded_pw"] = get_or_set_secret(
@@ -790,11 +717,11 @@ def generate_ctx(params):
     )
     ctx["config"]["oxtrust_resource_server_client_id"] = get_or_set_config(
         "oxtrust_resource_server_client_id",
-        '0008-{}'.format(uuid.uuid4()),
+        '1401.{}'.format(uuid.uuid4()),
     )
     ctx["config"]["oxtrust_resource_id"] = get_or_set_config(
         "oxtrust_resource_id",
-        '0008-{}'.format(uuid.uuid4()),
+        '1403.{}'.format(uuid.uuid4()),
     )
     with open(ctx["config"]["api_rs_client_jks_fn"], "rb") as fr:
         ctx["secret"]["api_rs_jks_base64"] = get_or_set_secret(
@@ -836,7 +763,7 @@ def generate_ctx(params):
 
     ctx["config"]["oxtrust_requesting_party_client_id"] = get_or_set_config(
         "oxtrust_requesting_party_client_id",
-        '0008-{}'.format(uuid.uuid4()),
+        '1402.{}'.format(uuid.uuid4()),
     )
 
     with open(ctx["config"]["api_rp_client_jks_fn"], "rb") as fr:
@@ -862,12 +789,12 @@ def generate_ctx(params):
     # ======
     ctx["config"]["gluu_radius_client_id"] = get_or_set_config(
         "gluu_radius_client_id",
-        '0008-{}'.format(uuid.uuid4()),
+        '1701.{}'.format(uuid.uuid4()),
     )
-    ctx["config"]["ox_radius_client_id"] = get_or_set_config(
-        "ox_radius_client_id",
-        '0008-{}'.format(uuid.uuid4()),
-    )
+    # ctx["config"]["ox_radius_client_id"] = get_or_set_config(
+    #     "ox_radius_client_id",
+    #     '0008-{}'.format(uuid.uuid4()),
+    # )
     ctx["secret"]["gluu_ro_encoded_pw"] = get_or_set_secret(
         "gluu_ro_encoded_pw",
         encode_text(get_random_chars(), ctx["secret"]["encoded_salt"]),
@@ -1080,81 +1007,6 @@ def _dump_to_file(ctx_manager, filepath):
     data = json.dumps(data, indent=4)
     with open(filepath, "w") as f:
         f.write(data)
-
-
-def generate_couchbase_certs(country_code, state, city, org_name, hostname, email):
-    root_ca = "couchbase_ca"
-    intermediate = "couchbase_int"
-    node = "couchbase_pkey"
-
-    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(root_ca))
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(root_ca, err)
-
-    _, err, retcode = exec_cmd(
-        "openssl req -new -x509 -sha256 "
-        "-days 365 "
-        "-key /etc/certs/{0}.key "
-        "-out /etc/certs/{0}.pem "
-        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
-            root_ca, country_code, state, city, org_name, hostname, email
-        ),
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(root_ca, err)
-
-    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(intermediate))
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(intermediate, err)
-
-    _, err, retcode = exec_cmd(
-        "openssl req -new "
-        "-key /etc/certs/{0}.key "
-        "-out /etc/certs/{0}.csr "
-        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
-            intermediate, country_code, state, city, org_name, hostname, email
-        ),
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(intermediate, err)
-
-    V3_CA_EXT = """subjectKeyIdentifier = hash
-authorityKeyIdentifier = keyid:always,issuer:always
-basicConstraints = CA:true"""
-    with open("/etc/certs/couchbase_v3_ca.ext", "w") as f:
-        f.write(V3_CA_EXT)
-
-    _, err, retcode = exec_cmd(
-        "openssl x509 -req "
-        "-in /etc/certs/{0}.csr "
-        "-CA /etc/certs/{1}.pem "
-        "-CAkey /etc/certs/{1}.key "
-        "-CAcreateserial -CAserial /etc/certs/{1}.srl "
-        "-extfile /etc/certs/couchbase_v3_ca.ext "
-        "-out /etc/certs/{0}.pem "
-        "-days 365".format(intermediate, root_ca)
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(intermediate, err)
-
-    _, err, retcode = exec_cmd("openssl genrsa -out /etc/certs/{0}.key 2048".format(node))
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.key; reason={1}".format(node, err)
-
-    _, err, retcode = exec_cmd(
-        "openssl req -new "
-        "-key /etc/certs/{0}.key "
-        "-out /etc/certs/{0}.csr "
-        """-subj /C="{1}"/ST="{2}"/L="{3}"/O="{4}"/CN="{5}"/emailAddress='{6}'""".format(
-            node, country_code, state, city, org_name, hostname, email
-        ),
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.csr; reason={1}".format(node, err)
-
-    _, err, retcode = exec_cmd(
-        "openssl x509 -req "
-        "-in /etc/certs/{0}.csr "
-        "-CA /etc/certs/{1}.pem "
-        "-CAkey /etc/certs/{1}.key "
-        "-CAcreateserial -CAserial /etc/certs/{1}.srl "
-        "-out /etc/certs/{0}.pem "
-        "-days 365".format(node, intermediate)
-    )
-    assert retcode == 0, "Failed to generate /etc/certs/{0}.pem; reason={1}".format(node, err)
 
 
 # ============
