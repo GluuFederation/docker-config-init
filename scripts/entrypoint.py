@@ -22,8 +22,8 @@ from pygluu.containerlib.utils import safe_render
 from parameter import params_from_file
 from settings import LOGGING_CONFIG
 
-SIG_KEYS = "RS256 RS384 RS512 ES256 ES384 ES512"
-ENC_KEYS = "RSA_OAEP RSA1_5"
+SIG_KEYS = "RS256 RS384 RS512 ES256 ES384 ES512 PS256 PS384 PS512 RSA1_5 RSA-OAEP"
+ENC_KEYS = SIG_KEYS
 
 DEFAULT_CONFIG_FILE = "/app/db/config.json"
 DEFAULT_SECRET_FILE = "/app/db/secret.json"
