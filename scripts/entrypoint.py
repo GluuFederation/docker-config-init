@@ -845,6 +845,14 @@ def generate_ctx(params):
         get_random_chars(24),
     )
 
+    # =========
+    # Couchbase
+    # =========
+
+    ctx["config"]["couchbaseTrustStoreFn"] = get_or_set_config(
+        "couchbaseTrustStoreFn", "/etc/certs/couchbase.pkcs12",
+    )
+
     # populated config
     return ctx
 
