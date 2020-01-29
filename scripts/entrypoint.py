@@ -766,7 +766,7 @@ def generate_ctx(params):
         "api_rs_client_jwks_fn", "/etc/certs/api-rs-keys.json")
 
     ctx["secret"]["api_rs_client_jks_pass"] = get_or_set_secret(
-        "api_rs_client_jks_pass", "secret",
+        "api_rs_client_jks_pass", get_random_chars(),
     )
     ctx["secret"]["api_rs_client_jks_pass_encoded"] = get_or_set_secret(
         "api_rs_client_jks_pass_encoded",
@@ -812,7 +812,7 @@ def generate_ctx(params):
         "api_rp_client_jwks_fn", "/etc/certs/api-rp-keys.json")
 
     ctx["secret"]["api_rp_client_jks_pass"] = get_or_set_secret(
-        "api_rp_client_jks_pass", "secret",
+        "api_rp_client_jks_pass", get_random_chars(),
     )
     ctx["secret"]["api_rp_client_jks_pass_encoded"] = get_or_set_secret(
         "api_rp_client_jks_pass_encoded",
