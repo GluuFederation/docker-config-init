@@ -2,6 +2,12 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 4.0.1_08
+
+Released on January 29th, 2020.
+
+* Fixed hardcoded keystore password for oxTrust API.
+
 ## Version 4.0.1_07
 
 Released on January 22nd, 2020.
