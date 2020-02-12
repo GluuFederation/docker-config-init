@@ -7,7 +7,7 @@ ConfigInit is a special container used to load (generate/restore) and dump (back
 - Stable: N/A
 - Unstable: `gluufederation/config-init:4.1.0_dev`
 
-Refer to the [Changelog](https://github.com/GluuFederation/docker-config-init/blob/4.0/CHANGES.md) for details on new features, bug fixes, or older releases.
+Refer to the [Changelog](./CHANGES.md) for details on new features, bug fixes, or older releases.
 
 ## Environment Variables
 
