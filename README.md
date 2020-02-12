@@ -4,7 +4,7 @@ ConfigInit is a special container used to load (generate/restore) and dump (back
 
 ## Versions
 
-- Stable: `gluufederation/config-init:4.1.0`
+- Stable: N/A
 - Unstable: `gluufederation/config-init:4.1.0_dev`
 
 Refer to the [Changelog](https://github.com/GluuFederation/docker-config-init/blob/4.0/CHANGES.md) for details on new features, bug fixes, or older releases.
@@ -66,6 +66,7 @@ The load command can be used either to generate or restore config and secret for
         "state": "TX",
         "city": "Austin",
         "admin_pw": "S3cr3t+pass",
+        "ldap_pw": "S3cr3t+pass",
         "email": "s@gluu.local",
         "org_name": "Gluu Inc."
     }
@@ -84,9 +85,9 @@ The load command can be used either to generate or restore config and secret for
         -v /path/to/host/volume:/opt/config-init/db \
         -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
         -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-        gluufederation/config-init:4.0.1_05 load
+        gluufederation/config-init:4.1.0_dev load
     ```
-    
+
 #### Kubernetes
 
 1. To generate the initial configuration and secret, create `/path/to/host/volume/generate.json` similar to example below:
@@ -98,12 +99,13 @@ The load command can be used either to generate or restore config and secret for
         "state": "TX",
         "city": "Austin",
         "admin_pw": "S3cr3t+pass",
+        "ldap_pw": "S3cr3t+pass",
         "email": "s@gluu.local",
         "org_name": "Gluu Inc."
     }
     ```
-    
-1. Create config map `config-generate-params` 
+
+1. Create config map `config-generate-params`
 
    ```sh
    kubectl create cm config-generate-params --from-file=generate.json
@@ -127,7 +129,7 @@ The load command can be used either to generate or restore config and secret for
 	            name: config-generate-params
 	      containers:
 	        - name: config-init-load
-	          image: gluufederation/config-init:4.0.1_05
+	          image: gluufederation/config-init:4.1.0_dev
 	          volumeMounts:
 	            - mountPath: /opt/config-init/db/generate.json
 	              name: config-generate-params
@@ -137,7 +139,7 @@ The load command can be used either to generate or restore config and secret for
 	              name: config-cm
 	          args: ["load"]
     ```
-    
+
 -   To restore configuration and secrets from a backup of `/path/to/host/volume/config.json` and `/path/to/host/volume/secret.json`: mount the directory as `/opt/config-init/db` inside the container:
 
 1. Create config map `config-params` and `secret-params`:
@@ -146,7 +148,7 @@ The load command can be used either to generate or restore config and secret for
    kubectl create cm config-params --from-file=config.json
    kubectl create cm secret-params --from-file=secret.json
    ```
-   
+
 1. Mount the configmap into container and apply the yaml:
 
     ```yaml
@@ -167,7 +169,7 @@ The load command can be used either to generate or restore config and secret for
 	            name: secret-params
 	      containers:
 	        - name: config-init-load
-	          image: gluufederation/config-init:4.0.1_05
+	          image: gluufederation/config-init:4.1.0_dev
 	          volumeMounts:
 	            - mountPath: /opt/config-init/db/config.json
 	              name: config-params
@@ -201,7 +203,7 @@ docker run \
     -v /path/to/host/volume:/opt/config-init/db \
     -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
     -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-    gluufederation/config-init:4.0.1_05 dump
+    gluufederation/config-init:4.1.0_dev dump
 ```
 
 #### Kubernetes
@@ -217,7 +219,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: config-init-load
-          image: gluufederation/config-init:4.0.1_05
+          image: gluufederation/config-init:4.1.0_dev
           command:
             - /bin/sh
             - -c
@@ -249,7 +251,7 @@ docker run \
     -e GLUU_SECRET_VAULT_HOST=vault \
     -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
     -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-    gluufederation/config-init:4.0.1_05 migrate
+    gluufederation/config-init:4.1.0_dev migrate
 ```
 
 #### Kubernetes
@@ -272,7 +274,7 @@ spec:
             name: secret-params
       containers:
         - name: config-init-load
-          image: gluufederation/config-init:4.0.1_05
+          image: gluufederation/config-init:4.1.0_dev
           volumeMounts:
             - mountPath: /opt/config-init/db/config.json
               name: config-params
