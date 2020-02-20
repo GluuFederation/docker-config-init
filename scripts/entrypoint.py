@@ -380,7 +380,7 @@ def generate_ctx(params):
 
     ctx["config"]["scim_resource_oxid"] = get_or_set_config(
         "scim_resource_oxid",
-        "1203.".format(uuid.uuid4()),
+        "1203.{}".format(uuid.uuid4()),
     )
 
     # ===========
