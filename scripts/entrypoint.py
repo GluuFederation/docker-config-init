@@ -305,7 +305,7 @@ def generate_ctx(params):
         "scim_rs_client_jwks_fn", "/etc/certs/scim-rs-keys.json")
 
     ctx["secret"]["scim_rs_client_jks_pass"] = get_or_set_secret(
-        "scim_rs_client_jks_pass", "secret")
+        "scim_rs_client_jks_pass", get_random_chars())
 
     ctx["secret"]["scim_rs_client_jks_pass_encoded"] = get_or_set_secret(
         "scim_rs_client_jks_pass_encoded",
@@ -349,7 +349,7 @@ def generate_ctx(params):
         "scim_rp_client_jwks_fn", "/etc/certs/scim-rp-keys.json")
 
     ctx["secret"]["scim_rp_client_jks_pass"] = get_or_set_secret(
-        "scim_rp_client_jks_pass", "secret")
+        "scim_rp_client_jks_pass", get_random_chars())
 
     ctx["secret"]["scim_rp_client_jks_pass_encoded"] = get_or_set_secret(
         "scim_rp_client_jks_pass_encoded",
@@ -398,14 +398,14 @@ def generate_ctx(params):
         "passport_rs_client_jwks_fn", "/etc/certs/passport-rs-keys.json")
 
     ctx["secret"]["passport_rs_client_jks_pass"] = get_or_set_secret(
-        "passport_rs_client_jks_pass", "secret")
+        "passport_rs_client_jks_pass", get_random_chars())
 
     ctx["secret"]["passport_rs_client_jks_pass_encoded"] = get_or_set_secret(
         "passport_rs_client_jks_pass_encoded",
         encode_text(ctx["secret"]["passport_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    _, err, retcode = generate_openid_keys(
+    out, err, retcode = generate_openid_keys(
         ctx["secret"]["passport_rs_client_jks_pass"],
         ctx["config"]["passport_rs_client_jks_fn"],
         ctx["config"]["passport_rs_client_jwks_fn"],
@@ -414,6 +414,15 @@ def generate_ctx(params):
     if retcode != 0:
         logger.error("Unable to generate Passport RS keys; reason={}".format(err))
         click.Abort()
+
+    ctx["config"]["passport_rs_client_cert_alg"] = get_or_set_config(
+        "passport_rs_client_cert_alg", "RS512")
+
+    cert_alias = ""
+    for key in json.loads(out)["keys"]:
+        if key["alg"] == ctx["config"]["passport_rs_client_cert_alg"]:
+            cert_alias = key["kid"]
+            break
 
     basedir, fn = os.path.split(ctx["config"]["passport_rs_client_jwks_fn"])
     ctx["secret"]["passport_rs_client_base64_jwks"] = get_or_set_secret(
@@ -432,6 +441,10 @@ def generate_ctx(params):
         '1504.{}'.format(uuid.uuid4()),
     )
 
+    ctx["config"]["passport_rs_client_cert_alias"] = get_or_set_config(
+        "passport_rs_client_cert_alias", cert_alias
+    )
+
     # ===========
     # Passport RP
     # ===========
@@ -446,7 +459,7 @@ def generate_ctx(params):
     )
 
     ctx["secret"]["passport_rp_client_jks_pass"] = get_or_set_secret(
-        "passport_rp_client_jks_pass", "secret")
+        "passport_rp_client_jks_pass", get_random_chars())
 
     ctx["config"]["passport_rp_client_jks_fn"] = get_or_set_config(
         "passport_rp_client_jks_fn", "/etc/certs/passport-rp.jks")

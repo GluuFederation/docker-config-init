@@ -5,7 +5,7 @@ FROM openjdk:8-jre-alpine3.9
 # ===============
 
 RUN apk update \
-    && apk add --no-cache openssl py-pip shadow \
+    && apk add --no-cache openssl py-pip \
     && apk add --no-cache --virtual build-deps wget git
 
 # =============
@@ -14,12 +14,10 @@ RUN apk update \
 
 # JAR files required to generate OpenID Connect keys
 ENV GLUU_VERSION=4.1.0.Final \
-    GLUU_BUILD_DATE=2020-02-14
+    GLUU_BUILD_DATE="2020-02-25 15:02"
 
 RUN mkdir -p /app/javalibs \
     && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${GLUU_VERSION}/oxauth-client-${GLUU_VERSION}-jar-with-dependencies.jar -O /app/javalibs/oxauth-client.jar
-
-# RUN wget -q https://ox.gluu.org/maven/org/gluu/oxShibbolethKeyGenerator/${GLUU_VERSION}/oxShibbolethKeyGenerator-${GLUU_VERSION}.jar -O /app/javalibs/idp3_cml_keygenerator.jar
 
 # ====
 # Tini
