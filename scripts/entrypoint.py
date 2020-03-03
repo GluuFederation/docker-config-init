@@ -866,6 +866,8 @@ def generate_ctx(params):
         "couchbaseTrustStoreFn", "/etc/certs/couchbase.pkcs12",
     )
 
+    ctx["secret"]["couchbase_shib_user_password"] = get_random_chars()
+
     # populated config
     return ctx
 
