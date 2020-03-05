@@ -2,6 +2,19 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 4.1.0_01
+
+Released on March 5th, 2020.
+
+* Conformed to Gluu Server v4.1.
+* Removed obsolete config and secret that previously used to automate Couchbase container.
+
+## Version 4.0.1_09
+
+Released on March 2nd, 2020.
+
+* Pre-populated Passport RS cert alias.
+
 ## Version 4.0.1_08
 
 Released on January 29th, 2020.
