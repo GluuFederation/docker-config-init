@@ -5,7 +5,9 @@ FROM openjdk:8-jre-alpine3.9
 # ===============
 
 RUN apk update \
-    && apk add --no-cache openssl py-pip \
+    && apk add --no-cache openssl py3-pip \
+    && ln -sf /usr/bin/python3 /usr/bin/python \
+    && ln -sf /usr/bin/pip3 /usr/bin/pip \
     && apk add --no-cache --virtual build-deps wget git
 
 # =============
@@ -99,8 +101,8 @@ ENV GLUU_OVERWRITE_ALL=false \
 LABEL name="ConfigInit" \
     maintainer="Gluu Inc. <support@gluu.org>" \
     vendor="Gluu Federation" \
-    version="4.1.0" \
-    release="01" \
+    version="4.2.0" \
+    release="dev" \
     summary="Gluu ConfigInit" \
     description="Manage config and secret"
 
@@ -122,5 +124,5 @@ RUN mkdir -p /etc/certs /app/db \
 # # run the entrypoint as gluu user
 # USER 1000
 
-ENTRYPOINT ["tini", "-g", "--", "/app/scripts/entrypoint.sh"]
+ENTRYPOINT ["tini", "-g", "--", "sh", "/app/scripts/entrypoint.sh"]
 CMD ["--help"]

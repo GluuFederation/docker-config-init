@@ -1,4 +1,3 @@
-import hashlib
 import json
 import logging.config
 import os
@@ -18,6 +17,7 @@ from pygluu.containerlib.utils import exec_cmd
 from pygluu.containerlib.utils import as_boolean
 from pygluu.containerlib.utils import generate_base64_contents
 from pygluu.containerlib.utils import safe_render
+from pygluu.containerlib.utils import ldap_encode
 
 from parameter import params_from_file
 from settings import LOGGING_CONFIG
@@ -35,22 +35,15 @@ logger = logging.getLogger("entrypoint")
 manager = get_manager()
 
 
-def ldap_encode(password):
-    # borrowed from community-edition-setup project
-    # see http://git.io/vIRex
-    salt = os.urandom(4)
-    sha = hashlib.sha1(password)
-    sha.update(salt)
-    b64encoded = '{0}{1}'.format(sha.digest(), salt).encode('base64').strip()
-    encrypted_password = '{{SSHA}}{0}'.format(b64encoded)
-    return encrypted_password
+def bytes_as_isostring(val):
+    return str(val, "ISO-8859-1")
 
 
 def encode_template(fn, ctx, base_dir="/app/templates"):
     path = os.path.join(base_dir, fn)
     # ctx is nested which has `config` and `secret` keys
     data = {}
-    for _, v in ctx.iteritems():
+    for _, v in ctx.items():
         data.update(v)
     with open(path) as f:
         return generate_base64_contents(safe_render(f.read(), data))
@@ -71,7 +64,7 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
     out, err, retcode = exec_cmd(cmd)
     if retcode == 0:
         with open(jwks_path, "w") as f:
-            f.write(out)
+            f.write(str(out))
     return out, err, retcode
 
 
@@ -225,7 +218,7 @@ def generate_ctx(params):
     with open(ctx["config"]["ldapTrustStoreFn"], "rb") as fr:
         ctx["secret"]["ldap_pkcs12_base64"] = get_or_set_secret(
             "ldap_pkcs12_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"]),
         )
 
     ctx["secret"]["encoded_ldapTrustStorePass"] = get_or_set_secret(
@@ -287,7 +280,7 @@ def generate_ctx(params):
     with open(ctx["config"]["oxauth_openid_jks_fn"], "rb") as fr:
         ctx["secret"]["oxauth_jks_base64"] = get_or_set_secret(
             "oxauth_jks_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
+            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     # =======
@@ -331,7 +324,7 @@ def generate_ctx(params):
     with open(ctx["config"]["scim_rs_client_jks_fn"], "rb") as fr:
         ctx["secret"]["scim_rs_jks_base64"] = get_or_set_secret(
             "scim_rs_jks_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"]),
         )
 
     # =======
@@ -375,7 +368,7 @@ def generate_ctx(params):
     with open(ctx["config"]["scim_rp_client_jks_fn"], "rb") as fr:
         ctx["secret"]["scim_rp_jks_base64"] = get_or_set_secret(
             "scim_rp_jks_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"]),
         )
 
     ctx["config"]["scim_resource_oxid"] = get_or_set_config(
@@ -433,7 +426,7 @@ def generate_ctx(params):
     with open(ctx["config"]["passport_rs_client_jks_fn"], "rb") as fr:
         ctx["secret"]["passport_rs_jks_base64"] = get_or_set_secret(
             "passport_rs_jks_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
+            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     ctx["config"]["passport_resource_id"] = get_or_set_config(
@@ -512,7 +505,7 @@ def generate_ctx(params):
     with open(ctx["config"]["passport_rp_client_jks_fn"], "rb") as fr:
         ctx["secret"]["passport_rp_jks_base64"] = get_or_set_secret(
             "passport_rp_jks_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"]),
+            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"]),
         )
 
     with open(ctx["config"]["passport_rp_client_cert_fn"]) as fr:
@@ -632,10 +625,10 @@ def generate_ctx(params):
             encode_text(f.read(), ctx["secret"]["encoded_salt"])
         )
 
-    with open(ctx["config"]["shibJksFn"]) as f:
+    with open(ctx["config"]["shibJksFn"], "rb") as f:
         ctx["secret"]["shibIDP_jks_base64"] = get_or_set_secret(
             "shibIDP_jks_base64",
-            encode_text(f.read(), ctx["secret"]["encoded_salt"])
+            encode_text(bytes_as_isostring(f.read()), ctx["secret"]["encoded_salt"])
         )
 
     ctx["config"]["shibboleth_version"] = get_or_set_config("shibboleth_version", "v3")
@@ -739,7 +732,7 @@ def generate_ctx(params):
     with open(ctx["config"]["api_rs_client_jks_fn"], "rb") as fr:
         ctx["secret"]["api_rs_jks_base64"] = get_or_set_secret(
             "api_rs_jks_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
+            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     # ==============
@@ -782,7 +775,7 @@ def generate_ctx(params):
     with open(ctx["config"]["api_rp_client_jks_fn"], "rb") as fr:
         ctx["secret"]["api_rp_jks_base64"] = get_or_set_secret(
             "api_rp_jks_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
+            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     # =======================
@@ -837,7 +830,7 @@ def generate_ctx(params):
     with open("/etc/certs/gluu-radius.jks", "rb") as fr:
         ctx["secret"]["radius_jks_base64"] = get_or_set_secret(
             "radius_jks_base64",
-            encode_text(fr.read(), ctx["secret"]["encoded_salt"])
+            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     basedir, fn = os.path.split("/etc/certs/gluu-radius.keys")
@@ -993,7 +986,7 @@ get_or_set_secret = partial(_get_or_set, ctx_manager=manager.secret)
 def _save_generated_ctx(ctx_manager, filepath, data):
     logger.info("Saving {} to backend.".format(ctx_manager.adapter.type))
 
-    for k, v in data.iteritems():
+    for k, v in data.items():
         ctx_manager.set(k, v)
 
     logger.info("Saving {} to {}.".format(ctx_manager.adapter.type, filepath))
@@ -1017,7 +1010,7 @@ def _load_from_file(ctx_manager, filepath):
 
     # tolerancy before checking existing key
     time.sleep(5)
-    for k, v in data["_{}".format(ctx_manager.adapter.type)].iteritems():
+    for k, v in data["_{}".format(ctx_manager.adapter.type)].items():
         v = _get_or_set(k, v, ctx_manager)
         ctx_manager.set(k, v)
 
@@ -1205,7 +1198,7 @@ def migrate(overwrite, prune):
     if prune:
         logger.warn("prune mode is enabled")
 
-    for k, v in manager.config.all().iteritems():
+    for k, v in manager.config.all().items():
         if k not in SECRET_KEYS or not v:
             continue
 
