@@ -991,7 +991,7 @@ def _save_generated_ctx(ctx_manager, filepath, data):
 
     logger.info("Saving {} to {}.".format(ctx_manager.adapter.type, filepath))
     data = {"_{}".format(ctx_manager.adapter.type): data}
-    data = json.dumps(data, indent=4)
+    data = json.dumps(data, sort_keys=True, indent=4)
 
     with open(filepath, "w") as f:
         f.write(data)
@@ -1020,7 +1020,7 @@ def _dump_to_file(ctx_manager, filepath):
         ctx_manager.adapter.type, filepath))
 
     data = {"_{}".format(ctx_manager.adapter.type): ctx_manager.all()}
-    data = json.dumps(data, indent=4)
+    data = json.dumps(data, sort_keys=True, indent=4)
     with open(filepath, "w") as f:
         f.write(data)
 
