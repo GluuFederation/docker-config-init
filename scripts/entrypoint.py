@@ -110,6 +110,7 @@ def generate_ctx(params):
     """
     admin_pw = params["admin_pw"]
     ldap_pw = params["ldap_pw"]
+    redis_pw = params["redis_pw"]
     email = params["email"]
     hostname = params["hostname"]
     org_name = params["org_name"]
@@ -233,6 +234,14 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["ldap_truststore_pass"], ctx["secret"]["encoded_salt"]),
     )
 
+    # ======
+    # redis
+    # ======
+    if not redis_pw:
+        redis_pw = get_random_chars()
+    ctx["secret"]["redis_pw"] = get_or_set_secret(
+        "redis_pw", encode_text(redis_pw, ctx["secret"]["encoded_salt"]),
+    )
     # ======
     # oxAuth
     # ======
@@ -1163,6 +1172,7 @@ def migrate(overwrite, prune):
         'ldap_ssl_cert',
         'ldap_ssl_key',
         'ldap_ssl_cacert',
+        'redis_pw',
         'ldap_pkcs12_base64',
         'encoded_ldapTrustStorePass',
         'encoded_ldap_pw',
