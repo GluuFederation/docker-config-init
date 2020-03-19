@@ -13,8 +13,8 @@ RUN apk update \
 # =============
 
 # JAR files required to generate OpenID Connect keys
-ENV GLUU_VERSION=4.1.0.Final \
-    GLUU_BUILD_DATE="2020-02-28 15:42"
+ENV GLUU_VERSION=4.1.1.Final \
+    GLUU_BUILD_DATE="2020-03-19 13:53"
 
 RUN mkdir -p /app/javalibs \
     && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${GLUU_VERSION}/oxauth-client-${GLUU_VERSION}-jar-with-dependencies.jar -O /app/javalibs/oxauth-client.jar
@@ -109,7 +109,7 @@ ENV GLUU_OVERWRITE_ALL=false \
 LABEL name="ConfigInit" \
     maintainer="Gluu Inc. <support@gluu.org>" \
     vendor="Gluu Federation" \
-    version="4.1.0" \
+    version="4.1.1" \
     release="01" \
     summary="Gluu ConfigInit" \
     description="Manage config and secret"
@@ -132,5 +132,5 @@ RUN mkdir -p /etc/certs /app/db \
 # # run the entrypoint as gluu user
 # USER 1000
 
-ENTRYPOINT ["tini", "-g", "--", "/app/scripts/entrypoint.sh"]
+ENTRYPOINT ["tini", "-g", "--", "sh", "/app/scripts/entrypoint.sh"]
 CMD ["--help"]
