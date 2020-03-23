@@ -9,6 +9,13 @@ Released on March 5th, 2020.
 * Conformed to Gluu Server v4.1.
 * Removed obsolete config and secret that previously used to automate Couchbase container.
 
+## Version 4.0.1_10
+
+Released on March 24th, 2020.
+
+* Pre-populated SCIM RS cert alias. Ref: https://github.com/GluuFederation/docker-config-init/issues/16.
+* Pre-populated API RS cert alias. Ref: https://github.com/GluuFederation/docker-config-init/issues/17.
+
 ## Version 4.0.1_09
 
 Released on March 2nd, 2020.
