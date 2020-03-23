@@ -2,6 +2,13 @@
 
 Here you can see an overview of changes between each release.
 
+## Version 4.0.1_10
+
+Released on March 24th, 2020.
+
+* Pre-populated SCIM RS cert alias. Ref: https://github.com/GluuFederation/docker-config-init/issues/16.
+* Pre-populated API RS cert alias. Ref: https://github.com/GluuFederation/docker-config-init/issues/17.
+
 ## Version 4.0.1_09
 
 Released on March 2nd, 2020.
