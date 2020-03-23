@@ -386,7 +386,7 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["scim_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    _, err, retcode = generate_openid_keys(
+    out, err, retcode = generate_openid_keys(
         ctx["secret"]["scim_rs_client_jks_pass"],
         ctx["config"]["scim_rs_client_jks_fn"],
         ctx["config"]["scim_rs_client_jwks_fn"],
@@ -396,10 +396,23 @@ def generate_ctx(params):
         logger.error("Unable to generate SCIM RS keys; reason={}".format(err))
         click.Abort()
 
+    ctx["config"]["scim_rs_client_cert_alg"] = get_or_set_config(
+        "scim_rs_client_cert_alg", "RS512")
+
+    cert_alias = ""
+    for key in json.loads(out)["keys"]:
+        if key["alg"] == ctx["config"]["scim_rs_client_cert_alg"]:
+            cert_alias = key["kid"]
+            break
+
     basedir, fn = os.path.split(ctx["config"]["scim_rs_client_jwks_fn"])
     ctx["secret"]["scim_rs_client_base64_jwks"] = get_or_set_secret(
         "scim_rs_client_base64_jwks",
         encode_template(fn, ctx, basedir),
+    )
+
+    ctx["config"]["scim_rs_client_cert_alias"] = get_or_set_config(
+        "scim_rs_client_cert_alias", cert_alias
     )
 
     with open(ctx["config"]["scim_rs_client_jks_fn"], "rb") as fr:
@@ -786,7 +799,7 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["api_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    _, err, retcode = generate_openid_keys(
+    out, err, retcode = generate_openid_keys(
         ctx["secret"]["api_rs_client_jks_pass"],
         ctx["config"]["api_rs_client_jks_fn"],
         ctx["config"]["api_rs_client_jwks_fn"],
@@ -796,11 +809,25 @@ def generate_ctx(params):
         logger.error("Unable to generate oxTrust API RS keys; reason={}".format(err))
         click.Abort()
 
+    ctx["config"]["api_rs_client_cert_alg"] = get_or_set_config(
+        "api_rs_client_cert_alg", "RS512")
+
+    cert_alias = ""
+    for key in json.loads(out)["keys"]:
+        if key["alg"] == ctx["config"]["api_rs_client_cert_alg"]:
+            cert_alias = key["kid"]
+            break
+
     basedir, fn = os.path.split(ctx["config"]["api_rs_client_jwks_fn"])
     ctx["secret"]["api_rs_client_base64_jwks"] = get_or_set_secret(
         "api_rs_client_base64_jwks",
         encode_template(fn, ctx, basedir),
     )
+
+    ctx["config"]["api_rs_client_cert_alias"] = get_or_set_config(
+        "api_rs_client_cert_alias", cert_alias
+    )
+
     ctx["config"]["oxtrust_resource_server_client_id"] = get_or_set_config(
         "oxtrust_resource_server_client_id",
         '0008-{}'.format(uuid.uuid4()),
