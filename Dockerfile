@@ -5,9 +5,8 @@ FROM openjdk:8-jre-alpine3.9
 # ===============
 
 RUN apk update \
-    && apk add --no-cache openssl py-pip \
-    && apk add --no-cache --virtual build-deps wget git \
-    && apk add --no-cache curl
+    && apk add --no-cache openssl py-pip curl \
+    && apk add --no-cache --virtual build-deps wget git 
 
 # =============
 # oxAuth client
