@@ -6,7 +6,7 @@ FROM openjdk:8-jre-alpine3.9
 
 RUN apk update \
     && apk add --no-cache openssl py-pip curl \
-    && apk add --no-cache --virtual build-deps wget git 
+    && apk add --no-cache --virtual build-deps wget git
 
 # =============
 # oxAuth client
@@ -14,7 +14,7 @@ RUN apk update \
 
 # JAR files required to generate OpenID Connect keys
 ENV GLUU_VERSION=4.1.1.Final \
-    GLUU_BUILD_DATE="2020-03-19 13:53"
+    GLUU_BUILD_DATE="2020-03-26 12:55"
 
 RUN mkdir -p /app/javalibs \
     && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${GLUU_VERSION}/oxauth-client-${GLUU_VERSION}-jar-with-dependencies.jar -O /app/javalibs/oxauth-client.jar
@@ -110,7 +110,7 @@ LABEL name="ConfigInit" \
     maintainer="Gluu Inc. <support@gluu.org>" \
     vendor="Gluu Federation" \
     version="4.1.1" \
-    release="01" \
+    release="02" \
     summary="Gluu ConfigInit" \
     description="Manage config and secret"
 
