@@ -35,10 +35,6 @@ logger = logging.getLogger("entrypoint")
 manager = get_manager()
 
 
-def bytes_as_isostring(val):
-    return str(val, "ISO-8859-1")
-
-
 def encode_template(fn, ctx, base_dir="/app/templates"):
     path = os.path.join(base_dir, fn)
     # ctx is nested which has `config` and `secret` keys
@@ -103,6 +99,7 @@ def generate_ctx(params):
     """
     admin_pw = params["admin_pw"]
     ldap_pw = params["ldap_pw"]
+    redis_pw = params.get("redis_pw", "")
     email = params["email"]
     hostname = params["hostname"]
     org_name = params["org_name"]
@@ -218,13 +215,18 @@ def generate_ctx(params):
     with open(ctx["config"]["ldapTrustStoreFn"], "rb") as fr:
         ctx["secret"]["ldap_pkcs12_base64"] = get_or_set_secret(
             "ldap_pkcs12_base64",
-            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"]),
+            encode_text(str(fr.read()), ctx["secret"]["encoded_salt"]),
         )
 
     ctx["secret"]["encoded_ldapTrustStorePass"] = get_or_set_secret(
         "encoded_ldapTrustStorePass",
         encode_text(ctx["secret"]["ldap_truststore_pass"], ctx["secret"]["encoded_salt"]),
     )
+
+    # ======
+    # redis
+    # ======
+    ctx["secret"]["redis_pw"] = get_or_set_secret("redis_pw", redis_pw)
 
     # ======
     # oxAuth
@@ -280,7 +282,7 @@ def generate_ctx(params):
     with open(ctx["config"]["oxauth_openid_jks_fn"], "rb") as fr:
         ctx["secret"]["oxauth_jks_base64"] = get_or_set_secret(
             "oxauth_jks_base64",
-            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
+            encode_text(str(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     # =======
@@ -305,7 +307,7 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["scim_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    _, err, retcode = generate_openid_keys(
+    out, err, retcode = generate_openid_keys(
         ctx["secret"]["scim_rs_client_jks_pass"],
         ctx["config"]["scim_rs_client_jks_fn"],
         ctx["config"]["scim_rs_client_jwks_fn"],
@@ -315,16 +317,29 @@ def generate_ctx(params):
         logger.error("Unable to generate SCIM RS keys; reason={}".format(err))
         click.Abort()
 
+    ctx["config"]["scim_rs_client_cert_alg"] = get_or_set_config(
+        "scim_rs_client_cert_alg", "RS512")
+
+    cert_alias = ""
+    for key in json.loads(out)["keys"]:
+        if key["alg"] == ctx["config"]["scim_rs_client_cert_alg"]:
+            cert_alias = key["kid"]
+            break
+
     basedir, fn = os.path.split(ctx["config"]["scim_rs_client_jwks_fn"])
     ctx["secret"]["scim_rs_client_base64_jwks"] = get_or_set_secret(
         "scim_rs_client_base64_jwks",
         encode_template(fn, ctx, basedir),
     )
 
+    ctx["config"]["scim_rs_client_cert_alias"] = get_or_set_config(
+        "scim_rs_client_cert_alias", cert_alias
+    )
+
     with open(ctx["config"]["scim_rs_client_jks_fn"], "rb") as fr:
         ctx["secret"]["scim_rs_jks_base64"] = get_or_set_secret(
             "scim_rs_jks_base64",
-            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"]),
+            encode_text(str(fr.read()), ctx["secret"]["encoded_salt"]),
         )
 
     # =======
@@ -368,7 +383,7 @@ def generate_ctx(params):
     with open(ctx["config"]["scim_rp_client_jks_fn"], "rb") as fr:
         ctx["secret"]["scim_rp_jks_base64"] = get_or_set_secret(
             "scim_rp_jks_base64",
-            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"]),
+            encode_text(str(fr.read()), ctx["secret"]["encoded_salt"]),
         )
 
     ctx["config"]["scim_resource_oxid"] = get_or_set_config(
@@ -423,10 +438,14 @@ def generate_ctx(params):
         encode_template(fn, ctx, basedir),
     )
 
+    ctx["config"]["passport_rs_client_cert_alias"] = get_or_set_config(
+        "passport_rs_client_cert_alias", cert_alias
+    )
+
     with open(ctx["config"]["passport_rs_client_jks_fn"], "rb") as fr:
         ctx["secret"]["passport_rs_jks_base64"] = get_or_set_secret(
             "passport_rs_jks_base64",
-            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
+            encode_text(str(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     ctx["config"]["passport_resource_id"] = get_or_set_config(
@@ -505,7 +524,7 @@ def generate_ctx(params):
     with open(ctx["config"]["passport_rp_client_jks_fn"], "rb") as fr:
         ctx["secret"]["passport_rp_jks_base64"] = get_or_set_secret(
             "passport_rp_jks_base64",
-            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"]),
+            encode_text(str(fr.read()), ctx["secret"]["encoded_salt"]),
         )
 
     with open(ctx["config"]["passport_rp_client_cert_fn"]) as fr:
@@ -628,7 +647,7 @@ def generate_ctx(params):
     with open(ctx["config"]["shibJksFn"], "rb") as f:
         ctx["secret"]["shibIDP_jks_base64"] = get_or_set_secret(
             "shibIDP_jks_base64",
-            encode_text(bytes_as_isostring(f.read()), ctx["secret"]["encoded_salt"])
+            encode_text(str(f.read()), ctx["secret"]["encoded_salt"])
         )
 
     ctx["config"]["shibboleth_version"] = get_or_set_config("shibboleth_version", "v3")
@@ -681,13 +700,22 @@ def generate_ctx(params):
         ctx["secret"]["idp3EncryptionKeyText"] = get_or_set_secret(
             "idp3EncryptionKeyText", f.read())
 
-    # gen_idp3_key(ctx["secret"]["shibJksPass"])
+    _, err, code = gen_idp3_key(ctx["secret"]["shibJksPass"])
+    if code != 0:
+        logger.warninging(f"Unable to generate Shibboleth sealer; reason={err}")
+        click.Abort()
 
-    # with open("/etc/certs/sealer.jks") as f:
-    #     ctx["secret"]["sealer_jks_base64"] = get_or_set_secret(
-    #         "sealer_jks_base64",
-    #         encode_text(f.read(), ctx["secret"]["encoded_salt"])
-    #     )
+    with open("/etc/certs/sealer.jks", "rb") as f:
+        ctx["secret"]["sealer_jks_base64"] = get_or_set_secret(
+            "sealer_jks_base64",
+            encode_text(str(f.read()), ctx["secret"]["encoded_salt"])
+        )
+
+    with open("/etc/certs/sealer.kver") as f:
+        ctx["secret"]["sealer_kver_base64"] = get_or_set_secret(
+            "sealer_kver_base64",
+            encode_text(f.read(), ctx["secret"]["encoded_salt"])
+        )
 
     # ==============
     # oxTrust API RS
@@ -706,7 +734,7 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["api_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    _, err, retcode = generate_openid_keys(
+    out, err, retcode = generate_openid_keys(
         ctx["secret"]["api_rs_client_jks_pass"],
         ctx["config"]["api_rs_client_jks_fn"],
         ctx["config"]["api_rs_client_jwks_fn"],
@@ -716,11 +744,25 @@ def generate_ctx(params):
         logger.error("Unable to generate oxTrust API RS keys; reason={}".format(err))
         click.Abort()
 
+    ctx["config"]["api_rs_client_cert_alg"] = get_or_set_config(
+        "api_rs_client_cert_alg", "RS512")
+
+    cert_alias = ""
+    for key in json.loads(out)["keys"]:
+        if key["alg"] == ctx["config"]["api_rs_client_cert_alg"]:
+            cert_alias = key["kid"]
+            break
+
     basedir, fn = os.path.split(ctx["config"]["api_rs_client_jwks_fn"])
     ctx["secret"]["api_rs_client_base64_jwks"] = get_or_set_secret(
         "api_rs_client_base64_jwks",
         encode_template(fn, ctx, basedir),
     )
+
+    ctx["config"]["api_rs_client_cert_alias"] = get_or_set_config(
+        "api_rs_client_cert_alias", cert_alias
+    )
+
     ctx["config"]["oxtrust_resource_server_client_id"] = get_or_set_config(
         "oxtrust_resource_server_client_id",
         '1401.{}'.format(uuid.uuid4()),
@@ -732,7 +774,7 @@ def generate_ctx(params):
     with open(ctx["config"]["api_rs_client_jks_fn"], "rb") as fr:
         ctx["secret"]["api_rs_jks_base64"] = get_or_set_secret(
             "api_rs_jks_base64",
-            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
+            encode_text(str(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     # ==============
@@ -775,7 +817,7 @@ def generate_ctx(params):
     with open(ctx["config"]["api_rp_client_jks_fn"], "rb") as fr:
         ctx["secret"]["api_rp_jks_base64"] = get_or_set_secret(
             "api_rp_jks_base64",
-            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
+            encode_text(str(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     # =======================
@@ -830,7 +872,7 @@ def generate_ctx(params):
     with open("/etc/certs/gluu-radius.jks", "rb") as fr:
         ctx["secret"]["radius_jks_base64"] = get_or_set_secret(
             "radius_jks_base64",
-            encode_text(bytes_as_isostring(fr.read()), ctx["secret"]["encoded_salt"])
+            encode_text(str(fr.read()), ctx["secret"]["encoded_salt"])
         )
 
     basedir, fn = os.path.split("/etc/certs/gluu-radius.keys")
@@ -953,11 +995,17 @@ def generate_keystore(suffix, hostname, keypasswd):
     assert retcode == 0, "Failed to generate JKS keystore; reason={}".format(err)
 
 
-# def gen_idp3_key(shibJksPass):
-#     out, err, retcode = exec_cmd("java -classpath /app/javalibs/idp3_cml_keygenerator.jar "
-#                                  "'org.gluu.oxshibboleth.keygenerator.KeyGenerator' "
-#                                  "/etc/certs {}".format(shibJksPass))
-#     return out, err, retcode
+def gen_idp3_key(storepass):
+    cmd = " ".join([
+        "java",
+        "-classpath '/app/javalibs/*'",
+        "net.shibboleth.utilities.java.support.security.BasicKeystoreKeyStrategyTool",
+        "--storefile /etc/certs/sealer.jks",
+        "--versionfile /etc/certs/sealer.kver",
+        "--alias secret",
+        "--storepass {}".format(storepass),
+    ])
+    return exec_cmd(cmd)
 
 
 def _get_or_set(key, value, ctx_manager):
@@ -989,12 +1037,12 @@ def _save_generated_ctx(ctx_manager, filepath, data):
     for k, v in data.items():
         ctx_manager.set(k, v)
 
-    logger.info("Saving {} to {}.".format(ctx_manager.adapter.type, filepath))
-    data = {"_{}".format(ctx_manager.adapter.type): data}
-    data = json.dumps(data, sort_keys=True, indent=4)
+    # logger.info("Saving {} to {}.".format(ctx_manager.adapter.type, filepath))
+    # data = {"_{}".format(ctx_manager.adapter.type): data}
+    # data = json.dumps(data, sort_keys=True, indent=4)
 
-    with open(filepath, "w") as f:
-        f.write(data)
+    # with open(filepath, "w") as f:
+    #     f.write(data)
 
 
 def _load_from_file(ctx_manager, filepath):
@@ -1005,7 +1053,7 @@ def _load_from_file(ctx_manager, filepath):
         data = json.loads(f.read())
 
     if "_{}".format(ctx_manager.adapter.type) not in data:
-        logger.warn("Missing '_{}' key.".format(ctx_manager.adapter.type))
+        logger.warning("Missing '_{}' key.".format(ctx_manager.adapter.type))
         return
 
     # tolerancy before checking existing key
@@ -1023,7 +1071,6 @@ def _dump_to_file(ctx_manager, filepath):
     data = json.dumps(data, sort_keys=True, indent=4)
     with open(filepath, "w") as f:
         f.write(data)
-
 
 # ============
 # CLI commands
@@ -1067,7 +1114,7 @@ def load(generate_file, config_file, secret_file):
 
     if not any([config_file_found, secret_file_found]):
         should_generate = True
-        logger.warn("Unable to find {0} or {1}".format(config_file, secret_file))
+        logger.warning("Unable to find {0} or {1}".format(config_file, secret_file))
 
         logger.info("Loading parameters from {}".format(generate_file))
 
@@ -1095,6 +1142,7 @@ def load(generate_file, config_file, secret_file):
         for wrapper in wrappers:
             data = ctx[wrapper[0].adapter.type]
             _save_generated_ctx(wrapper[0], wrapper[1], data)
+            _dump_to_file(wrapper[0], wrapper[1])
     else:
         for wrapper in wrappers:
             logger.info("Found {}".format(wrapper[1]))
@@ -1128,93 +1176,6 @@ def dump(config_file, secret_file):
     ]
     for wrapper in wrappers:
         _dump_to_file(wrapper[0], wrapper[1])
-
-
-@cli.command()
-@click.option("--overwrite", default=False, help="Overwrite secret keys.", is_flag=True)
-@click.option("--prune", default=False, help="Prune migrated keys.", is_flag=True)
-def migrate(overwrite, prune):
-    """Migrates keys from config to secret backend.
-    """
-    SECRET_KEYS = (
-        'encoded_salt',
-        'pairwiseCalculationKey',
-        'pairwiseCalculationSalt',
-        'ldap_truststore_pass',
-        'ldap_ssl_cert',
-        'ldap_ssl_key',
-        'ldap_ssl_cacert',
-        'ldap_pkcs12_base64',
-        'encoded_ldapTrustStorePass',
-        'encoded_ldap_pw',
-        'encoded_ox_ldap_pw',
-        'encoded_replication_pw',
-        'encoded_ox_replication_pw',
-        'oxauthClient_encoded_pw',
-        'oxauth_openid_jks_pass',
-        'oxauth_openid_key_base64',
-        'scim_rs_client_jks_pass',
-        'scim_rs_client_jks_pass_encoded',
-        'scim_rs_client_base64_jwks',
-        'scim_rs_jks_base64',
-        'scim_rp_client_jks_pass',
-        'scim_rp_client_jks_pass_encoded',
-        'scim_rp_client_base64_jwks',
-        'scim_rp_jks_base64',
-        'passport_rs_client_jks_pass',
-        'passport_rs_client_jks_pass_encoded',
-        'passport_rs_client_base64_jwks',
-        'passport_rs_jks_base64',
-        'passport_rp_client_jks_pass',
-        'passport_rp_client_base64_jwks',
-        'passport_rp_jks_base64',
-        'passport_rp_client_cert_base64',
-        'passportSpKeyPass',
-        'passportSpJksPass',
-        'passport_sp_cert_base64',
-        'passport_sp_key_base64',
-        'ssl_cert',
-        'ssl_key',
-        'idpClient_encoded_pw',
-        'shibJksPass',
-        'encoded_shib_jks_pw',
-        'shibIDP_cert',
-        'shibIDP_key',
-        'shibIDP_jks_base64',
-        'idp3SigningCertificateText',
-        'idp3SigningKeyText',
-        'idp3EncryptionCertificateText',
-        'idp3EncryptionKeyText',
-        'sealer_jks_base64',
-        "oxauth_jks_base64",
-    )
-
-    deps = ["config_conn", "secret_conn"]
-    wait_for(manager, deps=deps)
-
-    if overwrite:
-        logger.warn("overwrite mode is enabled")
-
-    if prune:
-        logger.warn("prune mode is enabled")
-
-    for k, v in manager.config.all().items():
-        if k not in SECRET_KEYS or not v:
-            continue
-
-        # if key must be overwritten or not available in secret backend,
-        # then migrate it; note that to check whether key is actually
-        # in secret backend, we need to use low-level API
-        # (using `secret.adapter.get` instead of `secret.get`)
-        if overwrite or not manager.secret.adapter.get(k):
-            logger.info("migrating {} from config to secret backend".format(k))
-            manager.secret.set(k, v)
-
-        # if key must be removed from config, then delete it
-        # (only if it has been migrated)
-        if prune and manager.secret.adapter.get(k):
-            logger.info("deleting {} from config".format(k))
-            manager.config.delete(k)
 
 
 if __name__ == "__main__":

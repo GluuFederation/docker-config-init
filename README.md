@@ -4,8 +4,8 @@ ConfigInit is a special container used to load (generate/restore) and dump (back
 
 ## Versions
 
-- Stable: `gluufederation/config-init:4.1.0_01`
-- Unstable: `gluufederation/config-init:4.1.0_dev`
+- Stable: `gluufederation/config-init:4.1.1_02`
+- Unstable: `gluufederation/config-init:4.1.1_dev`
 
 Refer to the [Changelog](./CHANGES.md) for details on new features, bug fixes, or older releases.
 
@@ -85,7 +85,7 @@ The load command can be used either to generate or restore config and secret for
         -v /path/to/host/volume:/opt/config-init/db \
         -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
         -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-        gluufederation/config-init:4.1.0_01 load
+        gluufederation/config-init:4.1.1_02 load
     ```
 
 #### Kubernetes
@@ -129,7 +129,7 @@ The load command can be used either to generate or restore config and secret for
 	            name: config-generate-params
 	      containers:
 	        - name: config-init-load
-	          image: gluufederation/config-init:4.1.0_01
+	          image: gluufederation/config-init:4.1.1_02
 	          volumeMounts:
 	            - mountPath: /opt/config-init/db/generate.json
 	              name: config-generate-params
@@ -169,7 +169,7 @@ The load command can be used either to generate or restore config and secret for
 	            name: secret-params
 	      containers:
 	        - name: config-init-load
-	          image: gluufederation/config-init:4.1.0_01
+	          image: gluufederation/config-init:4.1.1_02
 	          volumeMounts:
 	            - mountPath: /opt/config-init/db/config.json
 	              name: config-params
@@ -203,7 +203,7 @@ docker run \
     -v /path/to/host/volume:/opt/config-init/db \
     -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
     -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-    gluufederation/config-init:4.1.0_01 dump
+    gluufederation/config-init:4.1.1_02 dump
 ```
 
 #### Kubernetes
@@ -219,7 +219,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: config-init-load
-          image: gluufederation/config-init:4.1.0_01
+          image: gluufederation/config-init:4.1.1_02
           command:
             - /bin/sh
             - -c
@@ -251,7 +251,7 @@ docker run \
     -e GLUU_SECRET_VAULT_HOST=vault \
     -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
     -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-    gluufederation/config-init:4.1.0_01 migrate
+    gluufederation/config-init:4.1.1_02 migrate
 ```
 
 #### Kubernetes
@@ -274,7 +274,7 @@ spec:
             name: secret-params
       containers:
         - name: config-init-load
-          image: gluufederation/config-init:4.1.0_01
+          image: gluufederation/config-init:4.1.1_02
           volumeMounts:
             - mountPath: /opt/config-init/db/config.json
               name: config-params
