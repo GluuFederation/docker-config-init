@@ -4,7 +4,6 @@ import os
 import random
 import time
 import uuid
-from functools import partial
 
 import click
 
@@ -94,74 +93,104 @@ def generate_pkcs12(suffix, passwd, hostname):
     assert retcode == 0, "Failed to generate PKCS12 file; reason={}".format(err)
 
 
-class CtxGenerator(object):
-    def __init__(self, params, manager=None):
-        self.params = params
+class CtxManager(object):
+    def __init__(self, manager):
+        self.manager = manager
         self.ctx = {"config": {}, "secret": {}}
-        # self.manager = manager
-        # self._config_ctx = manager.config.all()
-        # self._secret_ctx = manager.secret.all()
+        self._remote_config_ctx = None
+        self._remote_secret_ctx = None
 
-#     def _set_config(self):
-#         overwrite_all = as_boolean(os.environ.get("GLUU_OVERWRITE_ALL", False))
-#         if overwrite_all:
-#             logger.info("updating {} {!r}".format(manager.config.type, key))
-#             return value
+    @property
+    def remote_config_ctx(self):
+        if not self._remote_config_ctx:
+            self._remote_config_ctx = self.manager.config.all()
+        return self._remote_config_ctx
 
-#         # check existing value first
-#         _value = manager.config.get(key)
-#         if _value:
-#             logger.info("ignoring {} {!r}".format(ctx_manager.adapter.type, key))
-#             return _value
+    @property
+    def remote_secret_ctx(self):
+        if not self._remote_secret_ctx:
+            self._remote_secret_ctx = self.manager.secret.all()
+        return self._remote_secret_ctx
 
-#         logger.info("adding {} {!r}".format(ctx_manager.adapter.type, key))
-#         return value
+    def _set_config(self, key, value):
+        if as_boolean(os.environ.get("GLUU_OVERWRITE_ALL", False)):
+            logger.info("updating config {!r}".format(key))
+            self.ctx["config"][key] = value
+            return value
+
+        # check existing key first
+        if key in self.remote_config_ctx:
+            logger.info("ignoring config {!r}".format(key))
+            self.ctx["config"][key] = value = self.remote_config_ctx[key]
+            return value
+
+        logger.info("adding config {!r}".format(key))
+        self.ctx["config"][key] = value
+        return value
+
+    def _set_secret(self, key, value):
+        if as_boolean(os.environ.get("GLUU_OVERWRITE_ALL", False)):
+            logger.info("updating secret {!r}".format(key))
+            self.ctx["secret"][key] = value
+            return value
+
+        # check existing key first
+        if key in self.remote_secret_ctx:
+            logger.info("ignoring secret {!r}".format(key))
+            self.ctx["secret"][key] = value = self.remote_secret_ctx[key]
+            return value
+
+        logger.info("adding secret {!r}".format(key))
+        self.ctx["secret"][key] = value
+        return value
+
+
+class CtxGenerator(object):
+    def __init__(self, manager, params):
+        self.params = params
+        self.manager = manager
+        self.ctx_manager = CtxManager(self.manager)
+
+    @property
+    def ctx(self):
+        return self.ctx_manager.ctx
+
+    def _set_config(self, key, value):
+        return self.ctx_manager._set_config(key, value)
+
+    def _set_secret(self, key, value):
+        return self.ctx_manager._set_secret(key, value)
 
     def base_ctx(self):
-        self.ctx["secret"]["encoded_salt"] = get_or_set_secret("encoded_salt", get_random_chars(24))
-        self.ctx["config"]["orgName"] = get_or_set_config("orgName", self.params["org_name"])
-        self.ctx["config"]["country_code"] = get_or_set_config("country_code", self.params["country_code"])
-        self.ctx["config"]["state"] = get_or_set_config("state", self.params["state"])
-        self.ctx["config"]["city"] = get_or_set_config("city", self.params["city"])
-        self.ctx["config"]["hostname"] = get_or_set_config("hostname", self.params["hostname"])
-        self.ctx["config"]["admin_email"] = get_or_set_config("admin_email", self.params["email"])
-        self.ctx["config"]["default_openid_jks_dn_name"] = get_or_set_config(
-            "default_openid_jks_dn_name",
-            "CN=oxAuth CA Certificates",
-        )
-        self.ctx["secret"]["pairwiseCalculationKey"] = get_or_set_secret(
-            "pairwiseCalculationKey",
-            get_sys_random_chars(random.randint(20, 30)),
-        )
-        self.ctx["secret"]["pairwiseCalculationSalt"] = get_or_set_secret(
-            "pairwiseCalculationSalt",
-            get_sys_random_chars(random.randint(20, 30)),
-        )
-        self.ctx["config"]["jetty_base"] = get_or_set_config("jetty_base", "/opt/gluu/jetty")
-        self.ctx["config"]["fido2ConfigFolder"] = get_or_set_config("fido2ConfigFolder", "/etc/gluu/conf/fido2")
-        self.ctx["config"]["admin_inum"] = get_or_set_config("admin_inum", "{}".format(uuid.uuid4()))
-        self.ctx["secret"]["encoded_oxtrust_admin_password"] = get_or_set_secret(
-            "encoded_oxtrust_admin_password",
-            ldap_encode(self.params["admin_pw"]),
-        )
+        self._set_secret("encoded_salt", get_random_chars(24))
+        self._set_config("orgName", self.params["org_name"])
+        self._set_config("country_code", self.params["country_code"])
+        self._set_config("state", self.params["state"])
+        self._set_config("city", self.params["city"])
+        self._set_config("hostname", self.params["hostname"])
+        self._set_config("admin_email", self.params["email"])
+        self._set_config("default_openid_jks_dn_name", "CN=oxAuth CA Certificates")
+        self._set_secret("pairwiseCalculationKey", get_sys_random_chars(random.randint(20, 30)))
+        self._set_secret("pairwiseCalculationSalt", get_sys_random_chars(random.randint(20, 30)))
+        self._set_config("jetty_base", "/opt/gluu/jetty")
+        self._set_config("fido2ConfigFolder", "/etc/gluu/conf/fido2")
+        self._set_config("admin_inum", "{}".format(uuid.uuid4()))
+        self._set_secret("encoded_oxtrust_admin_password", ldap_encode(self.params["admin_pw"]))
 
     def ldap_ctx(self):
-        # self.ctx["secret"]["encoded_ldap_pw"] = get_or_set_secret("encoded_ldap_pw", ldap_encode(self.params["admin_pw"]))
-        self.ctx["secret"]["encoded_ox_ldap_pw"] = get_or_set_secret(
+        # self._set_secret("encoded_ldap_pw", ldap_encode(self.params["admin_pw"]))
+        self._set_secret(
             "encoded_ox_ldap_pw",
             encode_text(self.params["ldap_pw"], self.ctx["secret"]["encoded_salt"]),
         )
-        self.ctx["config"]["ldap_init_host"] = get_or_set_config("ldap_init_host", "localhost")
-        self.ctx["config"]["ldap_init_port"] = int(get_or_set_config("ldap_init_port", 1636))
-        self.ctx["config"]["ldap_port"] = int(get_or_set_config("ldap_port", 1389))
-        self.ctx["config"]["ldaps_port"] = int(get_or_set_config("ldaps_port", 1636))
-        self.ctx["config"]["ldap_binddn"] = get_or_set_config("ldap_binddn", "cn=directory manager")
-        self.ctx["config"]["ldap_site_binddn"] = get_or_set_config("ldap_site_binddn", "cn=directory manager")
-        self.ctx["secret"]["ldap_truststore_pass"] = get_or_set_secret(
-            "ldap_truststore_pass",
-            get_random_chars(),
-        )
-        self.ctx["config"]["ldapTrustStoreFn"] = get_or_set_config("ldapTrustStoreFn", "/etc/certs/opendj.pkcs12")
+        self._set_config("ldap_init_host", "localhost")
+        self._set_config("ldap_init_port", 1636)
+        self._set_config("ldap_port", 1389)
+        self._set_config("ldaps_port", 1636)
+        self._set_config("ldap_binddn", "cn=directory manager")
+        self._set_config("ldap_site_binddn", "cn=directory manager")
+        self._set_secret("ldap_truststore_pass", get_random_chars())
+        self._set_config("ldapTrustStoreFn", "/etc/certs/opendj.pkcs12")
 
         generate_ssl_certkey(
             "opendj",
@@ -176,24 +205,21 @@ class CtxGenerator(object):
         with open("/etc/certs/opendj.pem", "w") as fw:
             with open("/etc/certs/opendj.crt") as fr:
                 ldap_ssl_cert = fr.read()
-
-                self.ctx["secret"]["ldap_ssl_cert"] = get_or_set_secret(
+                self._set_secret(
                     "ldap_ssl_cert",
                     encode_text(ldap_ssl_cert, self.ctx["secret"]["encoded_salt"]),
                 )
 
             with open("/etc/certs/opendj.key") as fr:
                 ldap_ssl_key = fr.read()
-
-                self.ctx["secret"]["ldap_ssl_key"] = get_or_set_secret(
+                self._set_secret(
                     "ldap_ssl_key",
                     encode_text(ldap_ssl_key, self.ctx["secret"]["encoded_salt"]),
                 )
 
             ldap_ssl_cacert = "".join([ldap_ssl_cert, ldap_ssl_key])
             fw.write(ldap_ssl_cacert)
-
-            self.ctx["secret"]["ldap_ssl_cacert"] = get_or_set_secret(
+            self._set_secret(
                 "ldap_ssl_cacert",
                 encode_text(ldap_ssl_cacert, self.ctx["secret"]["encoded_salt"]),
             )
@@ -204,48 +230,33 @@ class CtxGenerator(object):
             self.ctx["config"]["hostname"],
         )
         with open(self.ctx["config"]["ldapTrustStoreFn"], "rb") as fr:
-            self.ctx["secret"]["ldap_pkcs12_base64"] = get_or_set_secret(
+            self._set_secret(
                 "ldap_pkcs12_base64",
                 encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
             )
 
-        self.ctx["secret"]["encoded_ldapTrustStorePass"] = get_or_set_secret(
+        self._set_secret(
             "encoded_ldapTrustStorePass",
             encode_text(self.ctx["secret"]["ldap_truststore_pass"], self.ctx["secret"]["encoded_salt"]),
         )
 
     def redis_ctx(self):
-        self.ctx["secret"]["redis_pw"] = get_or_set_secret("redis_pw", self.params.get("redis_pw", ""))
+        self._set_secret("redis_pw", self.params.get("redis_pw", ""))
 
     def oxauth_ctx(self):
-        self.ctx["config"]["oxauth_client_id"] = get_or_set_config(
-            "oxauth_client_id",
-            "1001.{}".format(uuid.uuid4()),
-        )
-        self.ctx["secret"]["oxauthClient_encoded_pw"] = get_or_set_secret(
+        self._set_config("oxauth_client_id", "1001.{}".format(uuid.uuid4()))
+        self._set_secret(
             "oxauthClient_encoded_pw",
             encode_text(get_random_chars(), self.ctx["secret"]["encoded_salt"]),
         )
-        self.ctx["config"]["oxauth_openid_jks_fn"] = get_or_set_config(
-            "oxauth_openid_jks_fn",
-            "/etc/certs/oxauth-keys.jks",
-        )
-        self.ctx["secret"]["oxauth_openid_jks_pass"] = get_or_set_secret(
+        self._set_config("oxauth_openid_jks_fn", "/etc/certs/oxauth-keys.jks")
+        self._set_secret(
             "oxauth_openid_jks_pass",
             get_random_chars(),
         )
-        self.ctx["config"]["oxauth_openid_jwks_fn"] = get_or_set_config(
-            "oxauth_openid_jwks_fn",
-            "/etc/certs/oxauth-keys.json",
-        )
-        self.ctx["config"]["oxauth_legacyIdTokenClaims"] = get_or_set_config(
-            "oxauth_legacyIdTokenClaims",
-            "true",
-        )
-        self.ctx["config"]["oxauth_openidScopeBackwardCompatibility"] = get_or_set_config(
-            "oxauth_openidScopeBackwardCompatibility",
-            "true",
-        )
+        self._set_config("oxauth_openid_jwks_fn", "/etc/certs/oxauth-keys.json")
+        self._set_config("oxauth_legacyIdTokenClaims", "true")
+        self._set_config("oxauth_openidScopeBackwardCompatibility", "true")
 
         _, err, retcode = generate_openid_keys(
             self.ctx["secret"]["oxauth_openid_jks_pass"],
@@ -259,39 +270,23 @@ class CtxGenerator(object):
             click.Abort()
 
         basedir, fn = os.path.split(self.ctx["config"]["oxauth_openid_jwks_fn"])
-        self.ctx["secret"]["oxauth_openid_key_base64"] = get_or_set_secret(
-            "oxauth_openid_key_base64",
-            encode_template(fn, self.ctx, basedir),
-        )
+        self._set_secret("oxauth_openid_key_base64", encode_template(fn, self.ctx, basedir))
 
         # oxAuth keys
-        self.ctx["config"]["oxauth_key_rotated_at"] = int(get_or_set_config(
-            "oxauth_key_rotated_at",
-            int(time.time()),
-        ))
+        self._set_config("oxauth_key_rotated_at", int(time.time()))
 
         with open(self.ctx["config"]["oxauth_openid_jks_fn"], "rb") as fr:
-            self.ctx["secret"]["oxauth_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "oxauth_jks_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"])
+                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
             )
 
     def scim_rs_ctx(self):
-        self.ctx["config"]["scim_rs_client_id"] = get_or_set_config(
-            "scim_rs_client_id",
-            "1201.{}".format(uuid.uuid4()),
-        )
-
-        self.ctx["config"]["scim_rs_client_jks_fn"] = get_or_set_config(
-            "scim_rs_client_jks_fn", "/etc/certs/scim-rs.jks")
-
-        self.ctx["config"]["scim_rs_client_jwks_fn"] = get_or_set_config(
-            "scim_rs_client_jwks_fn", "/etc/certs/scim-rs-keys.json")
-
-        self.ctx["secret"]["scim_rs_client_jks_pass"] = get_or_set_secret(
-            "scim_rs_client_jks_pass", get_random_chars())
-
-        self.ctx["secret"]["scim_rs_client_jks_pass_encoded"] = get_or_set_secret(
+        self._set_config("scim_rs_client_id", "1201.{}".format(uuid.uuid4()))
+        self._set_config("scim_rs_client_jks_fn", "/etc/certs/scim-rs.jks")
+        self._set_config("scim_rs_client_jwks_fn", "/etc/certs/scim-rs-keys.json")
+        self._set_secret("scim_rs_client_jks_pass", get_random_chars())
+        self._set_secret(
             "scim_rs_client_jks_pass_encoded",
             encode_text(self.ctx["secret"]["scim_rs_client_jks_pass"], self.ctx["secret"]["encoded_salt"]),
         )
@@ -306,8 +301,7 @@ class CtxGenerator(object):
             logger.error("Unable to generate SCIM RS keys; reason={}".format(err))
             click.Abort()
 
-        self.ctx["config"]["scim_rs_client_cert_alg"] = get_or_set_config(
-            "scim_rs_client_cert_alg", "RS512")
+        self._set_config("scim_rs_client_cert_alg", "RS512")
 
         cert_alias = ""
         for key in json.loads(out)["keys"]:
@@ -316,37 +310,21 @@ class CtxGenerator(object):
                 break
 
         basedir, fn = os.path.split(self.ctx["config"]["scim_rs_client_jwks_fn"])
-        self.ctx["secret"]["scim_rs_client_base64_jwks"] = get_or_set_secret(
-            "scim_rs_client_base64_jwks",
-            encode_template(fn, self.ctx, basedir),
-        )
-
-        self.ctx["config"]["scim_rs_client_cert_alias"] = get_or_set_config(
-            "scim_rs_client_cert_alias", cert_alias
-        )
+        self._set_secret("scim_rs_client_base64_jwks", encode_template(fn, self.ctx, basedir))
+        self._set_config("scim_rs_client_cert_alias", cert_alias)
 
         with open(self.ctx["config"]["scim_rs_client_jks_fn"], "rb") as fr:
-            self.ctx["secret"]["scim_rs_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "scim_rs_jks_base64",
                 encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
             )
 
     def scim_rp_ctx(self):
-        self.ctx["config"]["scim_rp_client_id"] = get_or_set_config(
-            "scim_rp_client_id",
-            "1202.{}".format(uuid.uuid4()),
-        )
-
-        self.ctx["config"]["scim_rp_client_jks_fn"] = get_or_set_config(
-            "scim_rp_client_jks_fn", "/etc/certs/scim-rp.jks")
-
-        self.ctx["config"]["scim_rp_client_jwks_fn"] = get_or_set_config(
-            "scim_rp_client_jwks_fn", "/etc/certs/scim-rp-keys.json")
-
-        self.ctx["secret"]["scim_rp_client_jks_pass"] = get_or_set_secret(
-            "scim_rp_client_jks_pass", get_random_chars())
-
-        self.ctx["secret"]["scim_rp_client_jks_pass_encoded"] = get_or_set_secret(
+        self._set_config("scim_rp_client_id", "1202.{}".format(uuid.uuid4()))
+        self._set_config("scim_rp_client_jks_fn", "/etc/certs/scim-rp.jks")
+        self._set_config("scim_rp_client_jwks_fn", "/etc/certs/scim-rp-keys.json")
+        self._set_secret("scim_rp_client_jks_pass", get_random_chars())
+        self._set_secret(
             "scim_rp_client_jks_pass_encoded",
             encode_text(self.ctx["secret"]["scim_rp_client_jks_pass"], self.ctx["secret"]["encoded_salt"]),
         )
@@ -362,38 +340,22 @@ class CtxGenerator(object):
             click.Abort()
 
         basedir, fn = os.path.split(self.ctx["config"]["scim_rp_client_jwks_fn"])
-        self.ctx["secret"]["scim_rp_client_base64_jwks"] = get_or_set_secret(
-            "scim_rp_client_base64_jwks",
-            encode_template(fn, self.ctx, basedir),
-        )
+        self._set_secret("scim_rp_client_base64_jwks", encode_template(fn, self.ctx, basedir))
 
         with open(self.ctx["config"]["scim_rp_client_jks_fn"], "rb") as fr:
-            self.ctx["secret"]["scim_rp_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "scim_rp_jks_base64",
                 encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
             )
 
-        self.ctx["config"]["scim_resource_oxid"] = get_or_set_config(
-            "scim_resource_oxid",
-            "1203.{}".format(uuid.uuid4()),
-        )
+        self._set_config("scim_resource_oxid", "1203.{}".format(uuid.uuid4()))
 
     def passport_rs_ctx(self):
-        self.ctx["config"]["passport_rs_client_id"] = get_or_set_config(
-            "passport_rs_client_id",
-            "1501.{}".format(uuid.uuid4()),
-        )
-
-        self.ctx["config"]["passport_rs_client_jks_fn"] = get_or_set_config(
-            "passport_rs_client_jks_fn", "/etc/certs/passport-rs.jks")
-
-        self.ctx["config"]["passport_rs_client_jwks_fn"] = get_or_set_config(
-            "passport_rs_client_jwks_fn", "/etc/certs/passport-rs-keys.json")
-
-        self.ctx["secret"]["passport_rs_client_jks_pass"] = get_or_set_secret(
-            "passport_rs_client_jks_pass", get_random_chars())
-
-        self.ctx["secret"]["passport_rs_client_jks_pass_encoded"] = get_or_set_secret(
+        self._set_config("passport_rs_client_id", "1501.{}".format(uuid.uuid4()))
+        self._set_config("passport_rs_client_jks_fn", "/etc/certs/passport-rs.jks")
+        self._set_config("passport_rs_client_jwks_fn", "/etc/certs/passport-rs-keys.json")
+        self._set_secret("passport_rs_client_jks_pass", get_random_chars())
+        self._set_secret(
             "passport_rs_client_jks_pass_encoded",
             encode_text(self.ctx["secret"]["passport_rs_client_jks_pass"], self.ctx["secret"]["encoded_salt"]),
         )
@@ -408,8 +370,7 @@ class CtxGenerator(object):
             logger.error("Unable to generate Passport RS keys; reason={}".format(err))
             click.Abort()
 
-        self.ctx["config"]["passport_rs_client_cert_alg"] = get_or_set_config(
-            "passport_rs_client_cert_alg", "RS512")
+        self._set_config("passport_rs_client_cert_alg", "RS512")
 
         cert_alias = ""
         for key in json.loads(out)["keys"]:
@@ -418,55 +379,30 @@ class CtxGenerator(object):
                 break
 
         basedir, fn = os.path.split(self.ctx["config"]["passport_rs_client_jwks_fn"])
-        self.ctx["secret"]["passport_rs_client_base64_jwks"] = get_or_set_secret(
+        self._set_secret(
             "passport_rs_client_base64_jwks",
             encode_template(fn, self.ctx, basedir),
         )
 
-        self.ctx["config"]["passport_rs_client_cert_alias"] = get_or_set_config(
-            "passport_rs_client_cert_alias", cert_alias
-        )
+        self._set_config("passport_rs_client_cert_alias", cert_alias)
 
         with open(self.ctx["config"]["passport_rs_client_jks_fn"], "rb") as fr:
-            self.ctx["secret"]["passport_rs_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "passport_rs_jks_base64",
                 encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"])
             )
 
-        self.ctx["config"]["passport_resource_id"] = get_or_set_config(
-            "passport_resource_id",
-            '1504.{}'.format(uuid.uuid4()),
-        )
-
-        self.ctx["config"]["passport_rs_client_cert_alias"] = get_or_set_config(
-            "passport_rs_client_cert_alias", cert_alias
-        )
+        self._set_config("passport_resource_id", "1504.{}".format(uuid.uuid4()))
+        self._set_config("passport_rs_client_cert_alias", cert_alias)
 
     def passport_rp_ctx(self):
-        self.ctx["config"]["passport_rp_client_id"] = get_or_set_config(
-            "passport_rp_client_id",
-            "1502.{}".format(uuid.uuid4()),
-        )
-
-        self.ctx["config"]["passport_rp_ii_client_id"] = get_or_set_config(
-            "passport_rp_ii_client_id",
-            "1503.{}".format(uuid.uuid4()),
-        )
-
-        self.ctx["secret"]["passport_rp_client_jks_pass"] = get_or_set_secret(
-            "passport_rp_client_jks_pass", get_random_chars())
-
-        self.ctx["config"]["passport_rp_client_jks_fn"] = get_or_set_config(
-            "passport_rp_client_jks_fn", "/etc/certs/passport-rp.jks")
-
-        self.ctx["config"]["passport_rp_client_jwks_fn"] = get_or_set_config(
-            "passport_rp_client_jwks_fn", "/etc/certs/passport-rp-keys.json")
-
-        self.ctx["config"]["passport_rp_client_cert_fn"] = get_or_set_config(
-            "passport_rp_client_cert_fn", "/etc/certs/passport-rp.pem")
-
-        self.ctx["config"]["passport_rp_client_cert_alg"] = get_or_set_config(
-            "passport_rp_client_cert_alg", "RS512")
+        self._set_config("passport_rp_client_id", "1502.{}".format(uuid.uuid4()))
+        self._set_config("passport_rp_ii_client_id", "1503.{}".format(uuid.uuid4()))
+        self._set_secret("passport_rp_client_jks_pass", get_random_chars())
+        self._set_config("passport_rp_client_jks_fn", "/etc/certs/passport-rp.jks")
+        self._set_config("passport_rp_client_jwks_fn", "/etc/certs/passport-rp-keys.json")
+        self._set_config("passport_rp_client_cert_fn", "/etc/certs/passport-rp.pem")
+        self._set_config("passport_rp_client_cert_alg", "RS512")
 
         out, err, code = generate_openid_keys(
             self.ctx["secret"]["passport_rp_client_jks_pass"],
@@ -495,39 +431,29 @@ class CtxGenerator(object):
             click.Abort()
 
         basedir, fn = os.path.split(self.ctx["config"]["passport_rp_client_jwks_fn"])
-        self.ctx["secret"]["passport_rp_client_base64_jwks"] = get_or_set_secret(
-            "passport_rp_client_base64_jwks",
-            encode_template(fn, self.ctx, basedir),
-        )
+        self._set_secret("passport_rp_client_base64_jwks", encode_template(fn, self.ctx, basedir))
 
-        self.ctx["config"]["passport_rp_client_cert_alias"] = get_or_set_config(
-            "passport_rp_client_cert_alias", cert_alias
-        )
+        self._set_config("passport_rp_client_cert_alias", cert_alias)
 
         with open(self.ctx["config"]["passport_rp_client_jks_fn"], "rb") as fr:
-            self.ctx["secret"]["passport_rp_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "passport_rp_jks_base64",
                 encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
             )
 
         with open(self.ctx["config"]["passport_rp_client_cert_fn"]) as fr:
-            self.ctx["secret"]["passport_rp_client_cert_base64"] = get_or_set_secret(
+            self._set_secret(
                 "passport_rp_client_cert_base64",
                 encode_text(fr.read(), self.ctx["secret"]["encoded_salt"]),
             )
 
     def passport_sp_ctx(self):
-        self.ctx["secret"]["passportSpKeyPass"] = get_or_set_secret("passportSpKeyPass", get_random_chars())
-
-        self.ctx["config"]["passportSpTLSCACert"] = get_or_set_config("passportSpTLSCACert", '/etc/certs/passport-sp.pem')
-
-        self.ctx["config"]["passportSpTLSCert"] = get_or_set_config("passportSpTLSCert", '/etc/certs/passport-sp.crt')
-
-        self.ctx["config"]["passportSpTLSKey"] = get_or_set_config("passportSpTLSKey", '/etc/certs/passport-sp.key')
-
-        self.ctx["secret"]["passportSpJksPass"] = get_or_set_secret("passportSpJksPass", get_random_chars())
-
-        self.ctx["config"]["passportSpJksFn"] = get_or_set_config("passportSpJksFn", '/etc/certs/passport-sp.jks')
+        self._set_secret("passportSpKeyPass", get_random_chars())
+        self._set_config("passportSpTLSCACert", '/etc/certs/passport-sp.pem')
+        self._set_config("passportSpTLSCert", '/etc/certs/passport-sp.crt')
+        self._set_config("passportSpTLSKey", '/etc/certs/passport-sp.key')
+        self._set_secret("passportSpJksPass", get_random_chars())
+        self._set_config("passportSpJksFn", '/etc/certs/passport-sp.jks')
 
         generate_ssl_certkey(
             "passport-sp",
@@ -540,13 +466,13 @@ class CtxGenerator(object):
             self.ctx["config"]["city"],
         )
         with open(self.ctx["config"]["passportSpTLSCert"]) as f:
-            self.ctx["secret"]["passport_sp_cert_base64"] = get_or_set_secret(
+            self._set_secret(
                 "passport_sp_cert_base64",
                 encode_text(f.read(), self.ctx["secret"]["encoded_salt"])
             )
 
         with open(self.ctx["config"]["passportSpTLSKey"]) as f:
-            self.ctx["secret"]["passport_sp_key_base64"] = get_or_set_secret(
+            self._set_secret(
                 "passport_sp_key_base64",
                 encode_text(f.read(), self.ctx["secret"]["encoded_salt"])
             )
@@ -554,7 +480,7 @@ class CtxGenerator(object):
     def nginx_ctx(self):
         ssl_cert = "/etc/certs/gluu_https.crt"
         ssl_key = "/etc/certs/gluu_https.key"
-        self.ctx["secret"]["ssl_cert_pass"] = get_or_set_secret("ssl_cert_pass", get_random_chars())
+        self._set_secret("ssl_cert_pass", get_random_chars())
 
         # generate self-signed SSL cert and key only if they aren't exist
         if not(os.path.exists(ssl_cert) and os.path.exists(ssl_key)):
@@ -570,27 +496,20 @@ class CtxGenerator(object):
             )
 
         with open(ssl_cert) as f:
-            self.ctx["secret"]["ssl_cert"] = get_or_set_secret("ssl_cert", f.read())
+            self._set_secret("ssl_cert", f.read())
 
         with open(ssl_key) as f:
-            self.ctx["secret"]["ssl_key"] = get_or_set_secret("ssl_key", f.read())
+            self._set_secret("ssl_key", f.read())
 
     def oxshibboleth_ctx(self):
-        self.ctx["config"]["idp_client_id"] = get_or_set_config(
-            "idp_client_id",
-            "1101.{}".format(uuid.uuid4()),
-        )
-
-        self.ctx["secret"]["idpClient_encoded_pw"] = get_or_set_secret(
+        self._set_config("idp_client_id", "1101.{}".format(uuid.uuid4()))
+        self._set_secret(
             "idpClient_encoded_pw",
             encode_text(get_random_chars(), self.ctx["secret"]["encoded_salt"]),
         )
-
-        self.ctx["config"]["shibJksFn"] = get_or_set_config("shibJksFn", "/etc/certs/shibIDP.jks")
-
-        self.ctx["secret"]["shibJksPass"] = get_or_set_secret("shibJksPass", get_random_chars())
-
-        self.ctx["secret"]["encoded_shib_jks_pw"] = get_or_set_secret(
+        self._set_config("shibJksFn", "/etc/certs/shibIDP.jks")
+        self._set_secret("shibJksPass", get_random_chars())
+        self._set_secret(
             "encoded_shib_jks_pw",
             encode_text(self.ctx["secret"]["shibJksPass"], self.ctx["secret"]["encoded_salt"])
         )
@@ -609,29 +528,27 @@ class CtxGenerator(object):
         generate_keystore("shibIDP", self.ctx["config"]["hostname"], self.ctx["secret"]["shibJksPass"])
 
         with open("/etc/certs/shibIDP.crt") as f:
-            self.ctx["secret"]["shibIDP_cert"] = get_or_set_secret(
+            self._set_secret(
                 "shibIDP_cert",
                 encode_text(f.read(), self.ctx["secret"]["encoded_salt"])
             )
 
         with open("/etc/certs/shibIDP.key") as f:
-            self.ctx["secret"]["shibIDP_key"] = get_or_set_secret(
+            self._set_secret(
                 "shibIDP_key",
                 encode_text(f.read(), self.ctx["secret"]["encoded_salt"])
             )
 
         with open(self.ctx["config"]["shibJksFn"], "rb") as f:
-            self.ctx["secret"]["shibIDP_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "shibIDP_jks_base64",
                 encode_text(str(f.read()), self.ctx["secret"]["encoded_salt"])
             )
 
-        self.ctx["config"]["shibboleth_version"] = get_or_set_config("shibboleth_version", "v3")
-
-        self.ctx["config"]["idp3Folder"] = get_or_set_config("idp3Folder", "/opt/shibboleth-idp")
+        self._set_config("shibboleth_version", "v3")
+        self._set_config("idp3Folder", "/opt/shibboleth-idp")
 
         idp3_signing_cert = "/etc/certs/idp-signing.crt"
-
         idp3_signing_key = "/etc/certs/idp-signing.key"
 
         generate_ssl_certkey(
@@ -646,15 +563,14 @@ class CtxGenerator(object):
         )
 
         with open(idp3_signing_cert) as f:
-            self.ctx["secret"]["idp3SigningCertificateText"] = get_or_set_secret(
+            self._set_secret(
                 "idp3SigningCertificateText", f.read())
 
         with open(idp3_signing_key) as f:
-            self.ctx["secret"]["idp3SigningKeyText"] = get_or_set_secret(
+            self._set_secret(
                 "idp3SigningKeyText", f.read())
 
         idp3_encryption_cert = "/etc/certs/idp-encryption.crt"
-
         idp3_encryption_key = "/etc/certs/idp-encryption.key"
 
         generate_ssl_certkey(
@@ -669,12 +585,10 @@ class CtxGenerator(object):
         )
 
         with open(idp3_encryption_cert) as f:
-            self.ctx["secret"]["idp3EncryptionCertificateText"] = get_or_set_secret(
-                "idp3EncryptionCertificateText", f.read())
+            self._set_secret("idp3EncryptionCertificateText", f.read())
 
         with open(idp3_encryption_key) as f:
-            self.ctx["secret"]["idp3EncryptionKeyText"] = get_or_set_secret(
-                "idp3EncryptionKeyText", f.read())
+            self._set_secret("idp3EncryptionKeyText", f.read())
 
         _, err, code = gen_idp3_key(self.ctx["secret"]["shibJksPass"])
         if code != 0:
@@ -682,28 +596,22 @@ class CtxGenerator(object):
             click.Abort()
 
         with open("/etc/certs/sealer.jks", "rb") as f:
-            self.ctx["secret"]["sealer_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "sealer_jks_base64",
                 encode_text(str(f.read()), self.ctx["secret"]["encoded_salt"])
             )
 
         with open("/etc/certs/sealer.kver") as f:
-            self.ctx["secret"]["sealer_kver_base64"] = get_or_set_secret(
+            self._set_secret(
                 "sealer_kver_base64",
                 encode_text(f.read(), self.ctx["secret"]["encoded_salt"])
             )
 
     def oxtrust_api_rs_ctx(self):
-        self.ctx["config"]["api_rs_client_jks_fn"] = get_or_set_config(
-            "api_rs_client_jks_fn", "/etc/certs/api-rs.jks")
-
-        self.ctx["config"]["api_rs_client_jwks_fn"] = get_or_set_config(
-            "api_rs_client_jwks_fn", "/etc/certs/api-rs-keys.json")
-
-        self.ctx["secret"]["api_rs_client_jks_pass"] = get_or_set_secret(
-            "api_rs_client_jks_pass", get_random_chars(),
-        )
-        self.ctx["secret"]["api_rs_client_jks_pass_encoded"] = get_or_set_secret(
+        self._set_config("api_rs_client_jks_fn", "/etc/certs/api-rs.jks")
+        self._set_config("api_rs_client_jwks_fn", "/etc/certs/api-rs-keys.json")
+        self._set_secret("api_rs_client_jks_pass", get_random_chars())
+        self._set_secret(
             "api_rs_client_jks_pass_encoded",
             encode_text(self.ctx["secret"]["api_rs_client_jks_pass"], self.ctx["secret"]["encoded_salt"]),
         )
@@ -718,8 +626,7 @@ class CtxGenerator(object):
             logger.error("Unable to generate oxTrust API RS keys; reason={}".format(err))
             click.Abort()
 
-        self.ctx["config"]["api_rs_client_cert_alg"] = get_or_set_config(
-            "api_rs_client_cert_alg", "RS512")
+        self._set_config("api_rs_client_cert_alg", "RS512")
 
         cert_alias = ""
         for key in json.loads(out)["keys"]:
@@ -728,40 +635,24 @@ class CtxGenerator(object):
                 break
 
         basedir, fn = os.path.split(self.ctx["config"]["api_rs_client_jwks_fn"])
-        self.ctx["secret"]["api_rs_client_base64_jwks"] = get_or_set_secret(
-            "api_rs_client_base64_jwks",
-            encode_template(fn, self.ctx, basedir),
-        )
+        self._set_secret("api_rs_client_base64_jwks", encode_template(fn, self.ctx, basedir))
 
-        self.ctx["config"]["api_rs_client_cert_alias"] = get_or_set_config(
-            "api_rs_client_cert_alias", cert_alias
-        )
+        self._set_config("api_rs_client_cert_alias", cert_alias)
 
-        self.ctx["config"]["oxtrust_resource_server_client_id"] = get_or_set_config(
-            "oxtrust_resource_server_client_id",
-            '1401.{}'.format(uuid.uuid4()),
-        )
-        self.ctx["config"]["oxtrust_resource_id"] = get_or_set_config(
-            "oxtrust_resource_id",
-            '1403.{}'.format(uuid.uuid4()),
-        )
+        self._set_config("oxtrust_resource_server_client_id", '1401.{}'.format(uuid.uuid4()))
+        self._set_config("oxtrust_resource_id", '1403.{}'.format(uuid.uuid4()))
+
         with open(self.ctx["config"]["api_rs_client_jks_fn"], "rb") as fr:
-            self.ctx["secret"]["api_rs_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "api_rs_jks_base64",
                 encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"])
             )
 
     def oxtrust_api_rp_ctx(self):
-        self.ctx["config"]["api_rp_client_jks_fn"] = get_or_set_config(
-            "api_rp_client_jks_fn", "/etc/certs/api-rp.jks")
-
-        self.ctx["config"]["api_rp_client_jwks_fn"] = get_or_set_config(
-            "api_rp_client_jwks_fn", "/etc/certs/api-rp-keys.json")
-
-        self.ctx["secret"]["api_rp_client_jks_pass"] = get_or_set_secret(
-            "api_rp_client_jks_pass", get_random_chars(),
-        )
-        self.ctx["secret"]["api_rp_client_jks_pass_encoded"] = get_or_set_secret(
+        self._set_config("api_rp_client_jks_fn", "/etc/certs/api-rp.jks")
+        self._set_config("api_rp_client_jwks_fn", "/etc/certs/api-rp-keys.json")
+        self._set_secret("api_rp_client_jks_pass", get_random_chars())
+        self._set_secret(
             "api_rp_client_jks_pass_encoded",
             encode_text(self.ctx["secret"]["api_rp_client_jks_pass"], self.ctx["secret"]["encoded_salt"]),
         )
@@ -776,48 +667,30 @@ class CtxGenerator(object):
             click.Abort()
 
         basedir, fn = os.path.split(self.ctx["config"]["api_rp_client_jwks_fn"])
-        self.ctx["secret"]["api_rp_client_base64_jwks"] = get_or_set_secret(
-            "api_rp_client_base64_jwks",
-            encode_template(fn, self.ctx, basedir),
-        )
+        self._set_secret("api_rp_client_base64_jwks", encode_template(fn, self.ctx, basedir))
 
-        self.ctx["config"]["oxtrust_requesting_party_client_id"] = get_or_set_config(
-            "oxtrust_requesting_party_client_id",
-            '1402.{}'.format(uuid.uuid4()),
-        )
+        self._set_config("oxtrust_requesting_party_client_id", '1402.{}'.format(uuid.uuid4()))
 
         with open(self.ctx["config"]["api_rp_client_jks_fn"], "rb") as fr:
-            self.ctx["secret"]["api_rp_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "api_rp_jks_base64",
                 encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"])
             )
 
     def oxtrust_api_client_ctx(self):
-        self.ctx["config"]["api_test_client_id"] = get_or_set_config(
-            "api_test_client_id",
-            "0008-{}".format(uuid.uuid4()),
-        )
-        self.ctx["secret"]["api_test_client_secret"] = get_or_set_secret(
-            "api_test_client_secret",
-            get_random_chars(24),
-        )
+        self._set_config("api_test_client_id", "0008-{}".format(uuid.uuid4()))
+        self._set_secret("api_test_client_secret", get_random_chars(24))
 
     def radius_ctx(self):
-        self.ctx["config"]["gluu_radius_client_id"] = get_or_set_config(
-            "gluu_radius_client_id",
-            '1701.{}'.format(uuid.uuid4()),
-        )
-        # self.ctx["config"]["ox_radius_client_id"] = get_or_set_config(
-        #     "ox_radius_client_id",
-        #     '0008-{}'.format(uuid.uuid4()),
-        # )
-        self.ctx["secret"]["gluu_ro_encoded_pw"] = get_or_set_secret(
+        self._set_config("gluu_radius_client_id", '1701.{}'.format(uuid.uuid4()))
+        # self._set_config("ox_radius_client_id", '0008-{}'.format(uuid.uuid4()))
+        self._set_secret(
             "gluu_ro_encoded_pw",
             encode_text(get_random_chars(), self.ctx["secret"]["encoded_salt"]),
         )
 
         radius_jwt_pass = get_random_chars()
-        self.ctx["secret"]["radius_jwt_pass"] = get_or_set_secret(
+        self._set_secret(
             "radius_jwt_pass",
             encode_text(radius_jwt_pass, self.ctx["secret"]["encoded_salt"]),
         )
@@ -838,35 +711,28 @@ class CtxGenerator(object):
                 break
 
         with open("/etc/certs/gluu-radius.jks", "rb") as fr:
-            self.ctx["secret"]["radius_jks_base64"] = get_or_set_secret(
+            self._set_secret(
                 "radius_jks_base64",
                 encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"])
             )
 
         basedir, fn = os.path.split("/etc/certs/gluu-radius.keys")
-        self.ctx["secret"]["gluu_ro_client_base64_jwks"] = get_or_set_secret(
+        self._set_secret(
             "gluu_ro_client_base64_jwks",
             encode_template(fn, self.ctx, basedir),
         )
 
     def scim_client_ctx(self):
-        self.ctx["config"]["scim_test_client_id"] = get_or_set_config(
-            "scim_test_client_id",
-            "0008-{}".format(uuid.uuid4()),
-        )
-        self.ctx["secret"]["scim_test_client_secret"] = get_or_set_secret(
-            "scim_test_client_secret",
-            get_random_chars(24),
-        )
+        self._set_config("scim_test_client_id", "0008-{}".format(uuid.uuid4()))
+        self._set_secret("scim_test_client_secret", get_random_chars(24))
 
     def couchbase_ctx(self):
-        self.ctx["config"]["couchbaseTrustStoreFn"] = get_or_set_config(
-            "couchbaseTrustStoreFn", "/etc/certs/couchbase.pkcs12",
-        )
-        self.ctx["secret"]["couchbase_shib_user_password"] = get_random_chars()
+        self._set_config("couchbaseTrustStoreFn", "/etc/certs/couchbase.pkcs12")
+        self._set_secret("couchbase_shib_user_password", get_random_chars())
 
     def generate(self):
         self.base_ctx()
+        # raise click.Abort()
         self.ldap_ctx()
         self.redis_ctx()
         self.oxauth_ctx()
@@ -937,12 +803,6 @@ def generate_ssl_certkey(suffix, passwd, email, hostname, org_name,
            "/etc/certs/{}.key".format(suffix)
 
 
-def validate_country_code(ctx, param, value):
-    if len(value) != 2:
-        raise click.BadParameter("Country code must be two characters")
-    return value
-
-
 def generate_keystore(suffix, hostname, keypasswd):
     # converts key to pkcs12
     cmd = " ".join([
@@ -988,59 +848,50 @@ def gen_idp3_key(storepass):
     return exec_cmd(cmd)
 
 
-def _get_or_set(key, value, ctx_manager):
-    overwrite_all = as_boolean(os.environ.get("GLUU_OVERWRITE_ALL", False))
-    if overwrite_all:
-        logger.info("updating {} {!r}".format(ctx_manager.adapter.type, key))
-        return value
+def _save_generated_ctx(manager, data, type_):
+    if type_ == "config":
+        backend = manager.config
+    else:
+        backend = manager.secret
 
-    # check existing value first
-    _value = ctx_manager.get(key)
-    if _value:
-        logger.info("ignoring {} {!r}".format(ctx_manager.adapter.type, key))
-        return _value
-
-    logger.info("adding {} {!r}".format(ctx_manager.adapter.type, key))
-    return value
-
-
-#: Gets value of existing config or sets a new one
-get_or_set_config = partial(_get_or_set, ctx_manager=manager.config)
-
-#: Gets value of existing secret or sets a new one
-get_or_set_secret = partial(_get_or_set, ctx_manager=manager.secret)
-
-
-def _save_generated_ctx(ctx_manager, filepath, data):
-    logger.info("Saving {} to backend.".format(ctx_manager.adapter.type))
+    logger.info("Saving {} to backend".format(type_))
 
     for k, v in data.items():
-        ctx_manager.set(k, v)
+        backend.set(k, v)
 
 
-def _load_from_file(ctx_manager, filepath):
-    logger.info("Loading {} from {}.".format(
-        ctx_manager.adapter.type, filepath))
+def _load_from_file(manager, filepath, type_):
+    ctx_manager = CtxManager(manager)
+    if type_ == "config":
+        setter = ctx_manager._set_config
+    else:
+        setter = ctx_manager._set_secret
+
+    logger.info("Loading {} from {}".format(type_, filepath))
 
     with open(filepath, "r") as f:
         data = json.loads(f.read())
 
-    if "_{}".format(ctx_manager.adapter.type) not in data:
-        logger.warning("Missing '_{}' key.".format(ctx_manager.adapter.type))
+    if "_{}".format(type_) not in data:
+        logger.warning("Missing '_{}' key".format(type_))
         return
 
     # tolerancy before checking existing key
     time.sleep(5)
-    for k, v in data["_{}".format(ctx_manager.adapter.type)].items():
-        v = _get_or_set(k, v, ctx_manager)
-        ctx_manager.set(k, v)
+
+    for k, v in data["_{}".format(type_)].items():
+        setter(k, v)
 
 
-def _dump_to_file(ctx_manager, filepath):
-    logger.info("Saving {} to {}.".format(
-        ctx_manager.adapter.type, filepath))
+def _dump_to_file(manager, filepath, type_):
+    if type_ == "config":
+        backend = manager.config
+    else:
+        backend = manager.secret
 
-    data = {"_{}".format(ctx_manager.adapter.type): ctx_manager.all()}
+    logger.info("Saving {} to {}".format(type_, filepath))
+
+    data = {"_{}".format(type_): backend.all()}
     data = json.dumps(data, sort_keys=True, indent=4)
     with open(filepath, "w") as f:
         f.write(data)
@@ -1099,28 +950,25 @@ def load(generate_file, config_file, secret_file):
     deps = ["config_conn", "secret_conn"]
     wait_for(manager, deps=deps)
 
-    wrappers = [
-        (manager.config, config_file),
-        (manager.secret, secret_file),
-    ]
-
     if should_generate:
         logger.info("Generating config and secret.")
 
         # tolerancy before checking existing key
         time.sleep(5)
 
-        ctx_generator = CtxGenerator(params)
+        ctx_generator = CtxGenerator(manager, params)
         ctx = ctx_generator.generate()
 
-        for wrapper in wrappers:
-            data = ctx[wrapper[0].adapter.type]
-            _save_generated_ctx(wrapper[0], wrapper[1], data)
-            _dump_to_file(wrapper[0], wrapper[1])
-    else:
-        for wrapper in wrappers:
-            logger.info("Found {}".format(wrapper[1]))
-            _load_from_file(wrapper[0], wrapper[1])
+        _save_generated_ctx(manager, ctx["config"], "config")
+        _dump_to_file(manager, config_file, "config")
+
+        _save_generated_ctx(manager, ctx["secret"], "secret")
+        _dump_to_file(manager, secret_file, "secret")
+        return
+
+    # load from existing files
+    _load_from_file(manager, config_file, "config")
+    _load_from_file(manager, secret_file, "secret")
 
 
 @cli.command()
@@ -1144,12 +992,8 @@ def dump(config_file, secret_file):
     deps = ["config_conn", "secret_conn"]
     wait_for(manager, deps=deps)
 
-    wrappers = [
-        (manager.config, config_file),
-        (manager.secret, secret_file),
-    ]
-    for wrapper in wrappers:
-        _dump_to_file(wrapper[0], wrapper[1])
+    _dump_to_file(manager, config_file, "config")
+    _dump_to_file(manager, secret_file, "secret")
 
 
 if __name__ == "__main__":
