@@ -59,7 +59,7 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
     out, err, retcode = exec_cmd(cmd)
     if retcode == 0:
         with open(jwks_path, "w") as f:
-            f.write(str(out))
+            f.write(out.decode())
     return out, err, retcode
 
 
@@ -232,7 +232,7 @@ class CtxGenerator(object):
         with open(self.ctx["config"]["ldapTrustStoreFn"], "rb") as fr:
             self._set_secret(
                 "ldap_pkcs12_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
+                encode_text(fr.read(), self.ctx["secret"]["encoded_salt"]),
             )
 
         self._set_secret(
@@ -278,7 +278,7 @@ class CtxGenerator(object):
         with open(self.ctx["config"]["oxauth_openid_jks_fn"], "rb") as fr:
             self._set_secret(
                 "oxauth_jks_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
+                encode_text(fr.read(), self.ctx["secret"]["encoded_salt"]),
             )
 
     def scim_rs_ctx(self):
@@ -316,7 +316,7 @@ class CtxGenerator(object):
         with open(self.ctx["config"]["scim_rs_client_jks_fn"], "rb") as fr:
             self._set_secret(
                 "scim_rs_jks_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
+                encode_text(fr.read(), self.ctx["secret"]["encoded_salt"]),
             )
 
     def scim_rp_ctx(self):
@@ -345,7 +345,7 @@ class CtxGenerator(object):
         with open(self.ctx["config"]["scim_rp_client_jks_fn"], "rb") as fr:
             self._set_secret(
                 "scim_rp_jks_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
+                encode_text(fr.read(), self.ctx["secret"]["encoded_salt"]),
             )
 
         self._set_config("scim_resource_oxid", "1203.{}".format(uuid.uuid4()))
@@ -389,7 +389,7 @@ class CtxGenerator(object):
         with open(self.ctx["config"]["passport_rs_client_jks_fn"], "rb") as fr:
             self._set_secret(
                 "passport_rs_jks_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"])
+                encode_text(fr.read(), self.ctx["secret"]["encoded_salt"])
             )
 
         self._set_config("passport_resource_id", "1504.{}".format(uuid.uuid4()))
@@ -438,7 +438,7 @@ class CtxGenerator(object):
         with open(self.ctx["config"]["passport_rp_client_jks_fn"], "rb") as fr:
             self._set_secret(
                 "passport_rp_jks_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"]),
+                encode_text(fr.read(), self.ctx["secret"]["encoded_salt"]),
             )
 
         with open(self.ctx["config"]["passport_rp_client_cert_fn"]) as fr:
@@ -542,7 +542,7 @@ class CtxGenerator(object):
         with open(self.ctx["config"]["shibJksFn"], "rb") as f:
             self._set_secret(
                 "shibIDP_jks_base64",
-                encode_text(str(f.read()), self.ctx["secret"]["encoded_salt"])
+                encode_text(f.read(), self.ctx["secret"]["encoded_salt"])
             )
 
         self._set_config("shibboleth_version", "v3")
@@ -598,7 +598,7 @@ class CtxGenerator(object):
         with open("/etc/certs/sealer.jks", "rb") as f:
             self._set_secret(
                 "sealer_jks_base64",
-                encode_text(str(f.read()), self.ctx["secret"]["encoded_salt"])
+                encode_text(f.read(), self.ctx["secret"]["encoded_salt"])
             )
 
         with open("/etc/certs/sealer.kver") as f:
@@ -645,7 +645,7 @@ class CtxGenerator(object):
         with open(self.ctx["config"]["api_rs_client_jks_fn"], "rb") as fr:
             self._set_secret(
                 "api_rs_jks_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"])
+                encode_text(fr.read(), self.ctx["secret"]["encoded_salt"])
             )
 
     def oxtrust_api_rp_ctx(self):
@@ -674,7 +674,7 @@ class CtxGenerator(object):
         with open(self.ctx["config"]["api_rp_client_jks_fn"], "rb") as fr:
             self._set_secret(
                 "api_rp_jks_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"])
+                encode_text(fr.read(), self.ctx["secret"]["encoded_salt"])
             )
 
     def oxtrust_api_client_ctx(self):
@@ -713,7 +713,7 @@ class CtxGenerator(object):
         with open("/etc/certs/gluu-radius.jks", "rb") as fr:
             self._set_secret(
                 "radius_jks_base64",
-                encode_text(str(fr.read()), self.ctx["secret"]["encoded_salt"])
+                encode_text(fr.read(), self.ctx["secret"]["encoded_salt"])
             )
 
         basedir, fn = os.path.split("/etc/certs/gluu-radius.keys")
