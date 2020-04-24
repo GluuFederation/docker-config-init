@@ -911,6 +911,12 @@ def generate_ctx(params):
 
     ctx["secret"]["couchbase_shib_user_password"] = get_random_chars()
 
+    # ==============
+    # webdav/jcr/jca
+    # ==============
+    # ctx["secret"]["jca_pw"] = get_or_set_secret("jca_pw", get_random_chars())
+    ctx["secret"]["jca_pw"] = get_or_set_secret("jca_pw", "admin")
+
     # populated config
     return ctx
 
