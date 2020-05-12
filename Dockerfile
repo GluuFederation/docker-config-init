@@ -6,17 +6,17 @@ FROM openjdk:8-jre-alpine3.9
 
 RUN apk update \
     && apk add --no-cache openssl py3-pip curl \
+    && apk add --no-cache --virtual build-deps wget git \
     && ln -sf /usr/bin/python3 /usr/bin/python \
-    && ln -sf /usr/bin/pip3 /usr/bin/pip \
-    && apk add --no-cache --virtual build-deps wget git
+    && ln -sf /usr/bin/pip3 /usr/bin/pip
 
 # =============
 # oxAuth client
 # =============
 
 # JAR files required to generate OpenID Connect keys
-ENV GLUU_VERSION=4.1.1.Final \
-    GLUU_BUILD_DATE="2020-03-26 12:55"
+ARG GLUU_VERSION=4.2.0-SNAPSHOT
+ARG GLUU_BUILD_DATE="2020-05-12 17:18"
 
 RUN mkdir -p /app/javalibs \
     && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${GLUU_VERSION}/oxauth-client-${GLUU_VERSION}-jar-with-dependencies.jar -O /app/javalibs/oxauth-client.jar

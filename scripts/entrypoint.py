@@ -730,6 +730,11 @@ class CtxGenerator(object):
         self._set_config("couchbaseTrustStoreFn", "/etc/certs/couchbase.pkcs12")
         self._set_secret("couchbase_shib_user_password", get_random_chars())
 
+    def jackrabbit_ctx(self):
+        # self._set_secret("jca_pw", get_random_chars())
+        # self._set_secret("jca_pw", "admin")
+        pass
+
     def generate(self):
         self.base_ctx()
         # raise click.Abort()
@@ -749,6 +754,7 @@ class CtxGenerator(object):
         self.radius_ctx()
         self.scim_client_ctx()
         self.couchbase_ctx()
+        self.jackrabbit_ctx()
         # populated config
         return self.ctx
 
