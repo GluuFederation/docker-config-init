@@ -1,4 +1,3 @@
-# FROM openjdk:8-jre-alpine3.9
 FROM adoptopenjdk/openjdk11:alpine-jre
 
 # ===============
@@ -31,13 +30,6 @@ RUN mkdir -p /app/javalibs \
     && wget -q https://repo1.maven.org/maven2/com/beust/jcommander/1.48/jcommander-1.48.jar -O /app/javalibs/jcommander.jar \
     && wget -q https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.26/slf4j-api-1.7.26.jar -O /app/javalibs/slf4j-api.jar \
     && wget -q https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/1.7.26/slf4j-simple-1.7.26.jar -O /app/javalibs/slf4j-simple.jar
-
-# ====
-# # Tini
-# # ====
-
-# RUN wget -q https://github.com/krallin/tini/releases/download/v0.18.0/tini-static -O /usr/bin/tini \
-#     && chmod +x /usr/bin/tini
 
 # ======
 # Python
@@ -118,22 +110,13 @@ LABEL name="ConfigInit" \
     description="Manage config and secret"
 
 COPY scripts /app/scripts
-
 RUN mkdir -p /etc/certs /app/db \
     && chmod +x /app/scripts/entrypoint.sh \
     && ln -s /app /opt/config-init
-
-# # create gluu user
-# RUN useradd -ms /bin/sh --uid 1000 gluu \
-#     && usermod -a -G root gluu
-
-# # adjust ownership
-# RUN chown -R 1000:1000 /app \
-#     && chgrp -R 0 /app && chmod -R g=u /app \
-#     && chgrp -R 0 /etc/certs && chmod -R g=u /etc/certs
-
-# # run the entrypoint as gluu user
-# USER 1000
+# symlink JVM
+RUN mkdir -p /usr/lib/jvm/default-jvm /usr/java/latest \
+    && ln -sf /opt/java/openjdk /usr/lib/jvm/default-jvm/jre \
+    && ln -sf /usr/lib/jvm/default-jvm/jre /usr/java/latest/jre
 
 ENTRYPOINT ["tini", "-g", "--", "sh", "/app/scripts/entrypoint.sh"]
 CMD ["--help"]
