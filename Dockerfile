@@ -1,5 +1,10 @@
 FROM adoptopenjdk/openjdk11:alpine-jre
 
+# symlink JVM
+RUN mkdir -p /usr/lib/jvm/default-jvm /usr/java/latest \
+    && ln -sf /opt/java/openjdk /usr/lib/jvm/default-jvm/jre \
+    && ln -sf /usr/lib/jvm/default-jvm/jre /usr/java/latest/jre
+
 # ===============
 # Alpine packages
 # ===============
@@ -16,7 +21,7 @@ RUN apk update \
 
 # JAR files required to generate OpenID Connect keys
 ARG GLUU_VERSION=4.2.0-SNAPSHOT
-ARG GLUU_BUILD_DATE="2020-05-13 04:59"
+ARG GLUU_BUILD_DATE="2020-05-17 15:13"
 
 RUN mkdir -p /app/javalibs \
     && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${GLUU_VERSION}/oxauth-client-${GLUU_VERSION}-jar-with-dependencies.jar -O /app/javalibs/oxauth-client.jar
@@ -113,10 +118,6 @@ COPY scripts /app/scripts
 RUN mkdir -p /etc/certs /app/db \
     && chmod +x /app/scripts/entrypoint.sh \
     && ln -s /app /opt/config-init
-# symlink JVM
-RUN mkdir -p /usr/lib/jvm/default-jvm /usr/java/latest \
-    && ln -sf /opt/java/openjdk /usr/lib/jvm/default-jvm/jre \
-    && ln -sf /usr/lib/jvm/default-jvm/jre /usr/java/latest/jre
 
 ENTRYPOINT ["tini", "-g", "--", "sh", "/app/scripts/entrypoint.sh"]
 CMD ["--help"]
