@@ -21,8 +21,8 @@ from pygluu.containerlib.utils import ldap_encode
 from parameter import params_from_file
 from settings import LOGGING_CONFIG
 
-SIG_KEYS = "RS256 RS384 RS512 ES256 ES384 ES512 PS256 PS384 PS512 RSA1_5 RSA-OAEP"
-ENC_KEYS = SIG_KEYS
+DEFAULT_SIG_KEYS = "RS256 RS384 RS512 ES256 ES384 ES512"
+DEFAULT_ENC_KEYS = DEFAULT_SIG_KEYS
 
 DEFAULT_CONFIG_FILE = "/app/db/config.json"
 DEFAULT_SECRET_FILE = "/app/db/secret.json"
@@ -44,13 +44,13 @@ def encode_template(fn, ctx, base_dir="/app/templates"):
         return generate_base64_contents(safe_render(f.read(), data))
 
 
-def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365):
+def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365, sig_keys=DEFAULT_SIG_KEYS, enc_keys=DEFAULT_ENC_KEYS):
     cmd = " ".join([
         "java",
         "-Dlog4j.defaultInitOverride=true",
         "-jar", "/app/javalibs/oxauth-client.jar",
-        "-enc_keys", ENC_KEYS,
-        "-sig_keys", SIG_KEYS,
+        "-enc_keys", enc_keys,
+        "-sig_keys", sig_keys,
         "-dnname", "{!r}".format(dn),
         "-expiration", "{}".format(exp),
         "-keystore", jks_path,
@@ -264,10 +264,12 @@ class CtxGenerator(object):
             self.ctx["config"]["oxauth_openid_jwks_fn"],
             self.ctx["config"]["default_openid_jks_dn_name"],
             exp=2,
+            sig_keys="RS256 RS384 RS512 ES256 ES384 ES512 PS256 PS384 PS512",
+            enc_keys="RSA1_5 RSA-OAEP",
         )
         if retcode != 0:
             logger.error("Unable to generate oxAuth keys; reason={}".format(err))
-            click.Abort()
+            raise click.Abort()
 
         basedir, fn = os.path.split(self.ctx["config"]["oxauth_openid_jwks_fn"])
         self._set_secret("oxauth_openid_key_base64", encode_template(fn, self.ctx, basedir))
@@ -299,7 +301,7 @@ class CtxGenerator(object):
         )
         if retcode != 0:
             logger.error("Unable to generate SCIM RS keys; reason={}".format(err))
-            click.Abort()
+            raise click.Abort()
 
         self._set_config("scim_rs_client_cert_alg", "RS512")
 
@@ -337,7 +339,7 @@ class CtxGenerator(object):
         )
         if retcode != 0:
             logger.error("Unable to generate SCIM RP keys; reason={}".format(err))
-            click.Abort()
+            raise click.Abort()
 
         basedir, fn = os.path.split(self.ctx["config"]["scim_rp_client_jwks_fn"])
         self._set_secret("scim_rp_client_base64_jwks", encode_template(fn, self.ctx, basedir))
@@ -368,7 +370,7 @@ class CtxGenerator(object):
         )
         if retcode != 0:
             logger.error("Unable to generate Passport RS keys; reason={}".format(err))
-            click.Abort()
+            raise click.Abort()
 
         self._set_config("passport_rs_client_cert_alg", "RS512")
 
@@ -412,7 +414,7 @@ class CtxGenerator(object):
         )
         if code != 0:
             logger.error("Unable to generate Passport RP keys; reason={}".format(err))
-            click.Abort()
+            raise click.Abort()
 
         cert_alias = ""
         for key in json.loads(out)["keys"]:
@@ -428,7 +430,7 @@ class CtxGenerator(object):
         )
         if retcode != 0:
             logger.error("Unable to generate Passport RP client cert; reason={}".format(err))
-            click.Abort()
+            raise click.Abort()
 
         basedir, fn = os.path.split(self.ctx["config"]["passport_rp_client_jwks_fn"])
         self._set_secret("passport_rp_client_base64_jwks", encode_template(fn, self.ctx, basedir))
@@ -593,7 +595,7 @@ class CtxGenerator(object):
         _, err, code = gen_idp3_key(self.ctx["secret"]["shibJksPass"])
         if code != 0:
             logger.warninging(f"Unable to generate Shibboleth sealer; reason={err}")
-            click.Abort()
+            raise click.Abort()
 
         with open("/etc/certs/sealer.jks", "rb") as f:
             self._set_secret(
@@ -624,7 +626,7 @@ class CtxGenerator(object):
         )
         if retcode != 0:
             logger.error("Unable to generate oxTrust API RS keys; reason={}".format(err))
-            click.Abort()
+            raise click.Abort()
 
         self._set_config("api_rs_client_cert_alg", "RS512")
 
@@ -664,7 +666,7 @@ class CtxGenerator(object):
         )
         if retcode != 0:
             logger.error("Unable to generate oxTrust API RP keys; reason={}".format(err))
-            click.Abort()
+            raise click.Abort()
 
         basedir, fn = os.path.split(self.ctx["config"]["api_rp_client_jwks_fn"])
         self._set_secret("api_rp_client_base64_jwks", encode_template(fn, self.ctx, basedir))
@@ -703,7 +705,7 @@ class CtxGenerator(object):
         )
         if code != 0:
             logger.error("Unable to generate Gluu Radius keys; reason={}".format(err))
-            click.Abort()
+            raise click.Abort()
 
         for key in json.loads(out)["keys"]:
             if key["alg"] == "RS512":
