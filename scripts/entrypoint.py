@@ -872,8 +872,10 @@ def _load_from_file(manager, filepath, type_):
     ctx_manager = CtxManager(manager)
     if type_ == "config":
         setter = ctx_manager._set_config
+        backend = manager.config
     else:
         setter = ctx_manager._set_secret
+        backend = manager.secret
 
     logger.info("Loading {} from {}".format(type_, filepath))
 
@@ -888,7 +890,8 @@ def _load_from_file(manager, filepath, type_):
     time.sleep(5)
 
     for k, v in data["_{}".format(type_)].items():
-        setter(k, v)
+        val = setter(k, v)
+        backend.set(k, val)
 
 
 def _dump_to_file(manager, filepath, type_):
