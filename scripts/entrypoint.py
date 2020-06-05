@@ -110,6 +110,7 @@ def generate_ctx(params):
     """
     admin_pw = params["admin_pw"]
     ldap_pw = params["ldap_pw"]
+    redis_pw = params.get("redis_pw", "")
     email = params["email"]
     hostname = params["hostname"]
     org_name = params["org_name"]
@@ -234,6 +235,11 @@ def generate_ctx(params):
     )
 
     # ======
+    # redis
+    # ======
+    ctx["secret"]["redis_pw"] = get_or_set_secret("redis_pw", redis_pw)
+
+    # ======
     # oxAuth
     # ======
     ctx["config"]["oxauth_client_id"] = get_or_set_config(
@@ -312,7 +318,7 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["scim_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    _, err, retcode = generate_openid_keys(
+    out, err, retcode = generate_openid_keys(
         ctx["secret"]["scim_rs_client_jks_pass"],
         ctx["config"]["scim_rs_client_jks_fn"],
         ctx["config"]["scim_rs_client_jwks_fn"],
@@ -322,10 +328,23 @@ def generate_ctx(params):
         logger.error("Unable to generate SCIM RS keys; reason={}".format(err))
         click.Abort()
 
+    ctx["config"]["scim_rs_client_cert_alg"] = get_or_set_config(
+        "scim_rs_client_cert_alg", "RS512")
+
+    cert_alias = ""
+    for key in json.loads(out)["keys"]:
+        if key["alg"] == ctx["config"]["scim_rs_client_cert_alg"]:
+            cert_alias = key["kid"]
+            break
+
     basedir, fn = os.path.split(ctx["config"]["scim_rs_client_jwks_fn"])
     ctx["secret"]["scim_rs_client_base64_jwks"] = get_or_set_secret(
         "scim_rs_client_base64_jwks",
         encode_template(fn, ctx, basedir),
+    )
+
+    ctx["config"]["scim_rs_client_cert_alias"] = get_or_set_config(
+        "scim_rs_client_cert_alias", cert_alias
     )
 
     with open(ctx["config"]["scim_rs_client_jks_fn"], "rb") as fr:
@@ -428,6 +447,10 @@ def generate_ctx(params):
     ctx["secret"]["passport_rs_client_base64_jwks"] = get_or_set_secret(
         "passport_rs_client_base64_jwks",
         encode_template(fn, ctx, basedir),
+    )
+
+    ctx["config"]["passport_rs_client_cert_alias"] = get_or_set_config(
+        "passport_rs_client_cert_alias", cert_alias
     )
 
     with open(ctx["config"]["passport_rs_client_jks_fn"], "rb") as fr:
@@ -688,13 +711,19 @@ def generate_ctx(params):
         ctx["secret"]["idp3EncryptionKeyText"] = get_or_set_secret(
             "idp3EncryptionKeyText", f.read())
 
-    # gen_idp3_key(ctx["secret"]["shibJksPass"])
+    gen_idp3_key(ctx["secret"]["shibJksPass"])
 
-    # with open("/etc/certs/sealer.jks") as f:
-    #     ctx["secret"]["sealer_jks_base64"] = get_or_set_secret(
-    #         "sealer_jks_base64",
-    #         encode_text(f.read(), ctx["secret"]["encoded_salt"])
-    #     )
+    with open("/etc/certs/sealer.jks") as f:
+        ctx["secret"]["sealer_jks_base64"] = get_or_set_secret(
+            "sealer_jks_base64",
+            encode_text(f.read(), ctx["secret"]["encoded_salt"])
+        )
+
+    with open("/etc/certs/sealer.kver") as f:
+        ctx["secret"]["sealer_kver_base64"] = get_or_set_secret(
+            "sealer_kver_base64",
+            encode_text(f.read(), ctx["secret"]["encoded_salt"])
+        )
 
     # ==============
     # oxTrust API RS
@@ -713,7 +742,7 @@ def generate_ctx(params):
         encode_text(ctx["secret"]["api_rs_client_jks_pass"], ctx["secret"]["encoded_salt"]),
     )
 
-    _, err, retcode = generate_openid_keys(
+    out, err, retcode = generate_openid_keys(
         ctx["secret"]["api_rs_client_jks_pass"],
         ctx["config"]["api_rs_client_jks_fn"],
         ctx["config"]["api_rs_client_jwks_fn"],
@@ -723,11 +752,25 @@ def generate_ctx(params):
         logger.error("Unable to generate oxTrust API RS keys; reason={}".format(err))
         click.Abort()
 
+    ctx["config"]["api_rs_client_cert_alg"] = get_or_set_config(
+        "api_rs_client_cert_alg", "RS512")
+
+    cert_alias = ""
+    for key in json.loads(out)["keys"]:
+        if key["alg"] == ctx["config"]["api_rs_client_cert_alg"]:
+            cert_alias = key["kid"]
+            break
+
     basedir, fn = os.path.split(ctx["config"]["api_rs_client_jwks_fn"])
     ctx["secret"]["api_rs_client_base64_jwks"] = get_or_set_secret(
         "api_rs_client_base64_jwks",
         encode_template(fn, ctx, basedir),
     )
+
+    ctx["config"]["api_rs_client_cert_alias"] = get_or_set_config(
+        "api_rs_client_cert_alias", cert_alias
+    )
+
     ctx["config"]["oxtrust_resource_server_client_id"] = get_or_set_config(
         "oxtrust_resource_server_client_id",
         '1401.{}'.format(uuid.uuid4()),
@@ -868,6 +911,12 @@ def generate_ctx(params):
 
     ctx["secret"]["couchbase_shib_user_password"] = get_random_chars()
 
+    # ==============
+    # webdav/jcr/jca
+    # ==============
+    # ctx["secret"]["jca_pw"] = get_or_set_secret("jca_pw", get_random_chars())
+    # ctx["secret"]["jca_pw"] = get_or_set_secret("jca_pw", "admin")
+
     # populated config
     return ctx
 
@@ -960,11 +1009,17 @@ def generate_keystore(suffix, hostname, keypasswd):
     assert retcode == 0, "Failed to generate JKS keystore; reason={}".format(err)
 
 
-# def gen_idp3_key(shibJksPass):
-#     out, err, retcode = exec_cmd("java -classpath /app/javalibs/idp3_cml_keygenerator.jar "
-#                                  "'org.gluu.oxshibboleth.keygenerator.KeyGenerator' "
-#                                  "/etc/certs {}".format(shibJksPass))
-#     return out, err, retcode
+def gen_idp3_key(storepass):
+    cmd = " ".join([
+        "java",
+        "-classpath '/app/javalibs/*'",
+        "net.shibboleth.utilities.java.support.security.BasicKeystoreKeyStrategyTool",
+        "--storefile /etc/certs/sealer.jks",
+        "--versionfile /etc/certs/sealer.kver",
+        "--alias secret",
+        "--storepass {}".format(storepass),
+    ])
+    return exec_cmd(cmd)
 
 
 def _get_or_set(key, value, ctx_manager):
@@ -1151,6 +1206,7 @@ def migrate(overwrite, prune):
         'ldap_ssl_cert',
         'ldap_ssl_key',
         'ldap_ssl_cacert',
+        # 'redis_pw',
         'ldap_pkcs12_base64',
         'encoded_ldapTrustStorePass',
         'encoded_ldap_pw',

@@ -5,7 +5,7 @@ FROM openjdk:8-jre-alpine3.9
 # ===============
 
 RUN apk update \
-    && apk add --no-cache openssl py-pip \
+    && apk add --no-cache openssl py-pip curl \
     && apk add --no-cache --virtual build-deps wget git
 
 # =============
@@ -13,11 +13,21 @@ RUN apk update \
 # =============
 
 # JAR files required to generate OpenID Connect keys
-ENV GLUU_VERSION=4.1.0.Final \
-    GLUU_BUILD_DATE="2020-02-28 15:42"
+ENV GLUU_VERSION=4.1.1.Final \
+    GLUU_BUILD_DATE="2020-05-26 17:57"
 
 RUN mkdir -p /app/javalibs \
     && wget -q https://ox.gluu.org/maven/org/gluu/oxauth-client/${GLUU_VERSION}/oxauth-client-${GLUU_VERSION}-jar-with-dependencies.jar -O /app/javalibs/oxauth-client.jar
+
+# =================
+# Shibboleth sealer
+# =================
+
+RUN mkdir -p /app/javalibs \
+    && wget -q https://build.shibboleth.net/nexus/content/repositories/releases/net/shibboleth/utilities/java-support/7.5.1/java-support-7.5.1.jar -O /app/javalibs/java-support.jar \
+    && wget -q https://repo1.maven.org/maven2/com/beust/jcommander/1.48/jcommander-1.48.jar -O /app/javalibs/jcommander.jar \
+    && wget -q https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.26/slf4j-api-1.7.26.jar -O /app/javalibs/slf4j-api.jar \
+    && wget -q https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/1.7.26/slf4j-simple-1.7.26.jar -O /app/javalibs/slf4j-simple.jar
 
 # ====
 # Tini
@@ -99,8 +109,8 @@ ENV GLUU_OVERWRITE_ALL=false \
 LABEL name="ConfigInit" \
     maintainer="Gluu Inc. <support@gluu.org>" \
     vendor="Gluu Federation" \
-    version="4.1.0" \
-    release="01" \
+    version="4.1.1" \
+    release="03" \
     summary="Gluu ConfigInit" \
     description="Manage config and secret"
 
@@ -122,5 +132,5 @@ RUN mkdir -p /etc/certs /app/db \
 # # run the entrypoint as gluu user
 # USER 1000
 
-ENTRYPOINT ["tini", "-g", "--", "/app/scripts/entrypoint.sh"]
+ENTRYPOINT ["tini", "-g", "--", "sh", "/app/scripts/entrypoint.sh"]
 CMD ["--help"]
