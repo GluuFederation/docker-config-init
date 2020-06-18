@@ -17,7 +17,7 @@ LOGGING_CONFIG = {
             "level": "INFO",
             "propagate": True,
         },
-        "entrypoint": {
+        "config-init": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,

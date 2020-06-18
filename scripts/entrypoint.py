@@ -29,7 +29,7 @@ DEFAULT_SECRET_FILE = "/app/db/secret.json"
 DEFAULT_GENERATE_FILE = "/app/db/generate.json"
 
 logging.config.dictConfig(LOGGING_CONFIG)
-logger = logging.getLogger("entrypoint")
+logger = logging.getLogger("config-init")
 
 manager = get_manager()
 
@@ -1008,4 +1008,4 @@ def dump(config_file, secret_file):
 
 
 if __name__ == "__main__":
-    cli()
+    cli(prog_name="config-init")
