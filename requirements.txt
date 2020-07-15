@@ -1,3 +1,3 @@
 click==6.7
 Cerberus==1.3.1
--e git+https://github.com/GluuFederation/pygluu-containerlib@fee7b097e833ab3ab61655a54615b547a1083b7f#egg=pygluu-containerlib
+-e git+https://github.com/GluuFederation/pygluu-containerlib@3c45b068f6fded560d50e4f4e5e4f5b642c92cc0#egg=pygluu-containerlib
