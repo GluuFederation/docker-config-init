@@ -5,7 +5,7 @@ ConfigInit is a special container used to load (generate/restore) and dump (back
 ## Versions
 
 - Stable: `gluufederation/config-init:4.2.0_01`
-- Unstable: `gluufederation/config-init:4.2.0_dev`
+- Unstable: `gluufederation/config-init:4.2.1_dev`
 
 Refer to the [Changelog](./CHANGES.md) for details on new features, bug fixes, or older releases.
 
