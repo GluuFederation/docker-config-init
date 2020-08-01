@@ -255,8 +255,8 @@ class CtxGenerator(object):
             get_random_chars(),
         )
         self._set_config("oxauth_openid_jwks_fn", "/etc/certs/oxauth-keys.json")
-        self._set_config("oxauth_legacyIdTokenClaims", "true")
-        self._set_config("oxauth_openidScopeBackwardCompatibility", "true")
+        # self._set_config("oxauth_legacyIdTokenClaims", "true")
+        # self._set_config("oxauth_openidScopeBackwardCompatibility", "true")
 
         _, err, retcode = generate_openid_keys(
             self.ctx["secret"]["oxauth_openid_jks_pass"],
