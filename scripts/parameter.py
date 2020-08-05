@@ -2,6 +2,7 @@ import json
 import re
 
 import cerberus
+from fqdn import FQDN
 
 EMAIL_RGX = re.compile(
     r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
@@ -12,11 +13,9 @@ PASSWD_RGX = re.compile(
 
 
 def validate_hostname(field, value, error):
-    if len(value.strip().split(".")) < 3:
-        error(
-            field,
-            "hostname has to be at least three domain components",
-        )
+    fqdn = FQDN(value)
+    if not fqdn.is_valid:
+        error(field, "Invalid FQDN for hostname.")
 
 
 def validate_email(field, value, error):
