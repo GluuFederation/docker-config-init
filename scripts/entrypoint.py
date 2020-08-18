@@ -2,6 +2,7 @@ import json
 import logging.config
 import os
 import random
+import socket
 import time
 import uuid
 
@@ -17,6 +18,7 @@ from pygluu.containerlib.utils import as_boolean
 from pygluu.containerlib.utils import generate_base64_contents
 from pygluu.containerlib.utils import safe_render
 from pygluu.containerlib.utils import ldap_encode
+from pygluu.containerlib.utils import get_server_certificate
 
 from parameter import params_from_file
 from settings import LOGGING_CONFIG
@@ -484,8 +486,45 @@ class CtxGenerator(object):
         ssl_key = "/etc/certs/gluu_https.key"
         self._set_secret("ssl_cert_pass", get_random_chars())
 
-        # generate self-signed SSL cert and key only if they aren't exist
-        if not(os.path.exists(ssl_cert) and os.path.exists(ssl_key)):
+        # get cert and key (if available) with priorities below:
+        #
+        # 1. from mounted files
+        # 2. from fronted (key file is an empty file)
+        # 3. self-generate files
+
+        ssl_cert_exists = os.path.isfile(ssl_cert)
+        ssl_key_exists = os.path.isfile(ssl_key)
+
+        logger.info(f"Resolving {ssl_cert} and {ssl_key}")
+
+        # check from mounted files
+        if not (ssl_cert_exists and ssl_key_exists):
+            # no mounted files, hence download from frontend
+            addr = os.environ.get("GLUU_INGRESS_ADDRESS") or self.ctx["config"]["hostname"]
+            servername = os.environ.get("GLUU_INGRESS_SERVERNAME") or addr
+
+            logger.warning(
+                f"Unable to find mounted {ssl_cert} and {ssl_key}; "
+                f"trying to download from {addr}:443 (servername {servername})"
+            )
+            try:
+                # cert will be downloaded into `ssl_cert` path
+                get_server_certificate(addr, 443, ssl_cert, servername)
+                if not ssl_key_exists:
+                    # since cert is downloaded, key must mounted
+                    # or generate empty file
+                    with open(ssl_key, "w") as f:
+                        f.write("")
+            except (socket.gaierror, socket.timeout, ConnectionRefusedError) as exc:
+                # address not resolved or timed out
+                logger.warning(f"Unable to download cert; reason={exc}")
+            finally:
+                ssl_cert_exists = os.path.isfile(ssl_cert)
+                ssl_key_exists = os.path.isfile(ssl_key)
+
+        # no mounted nor downloaded files, hence we need to create self-generated files
+        if not (ssl_cert_exists and ssl_key_exists):
+            logger.info(f"Creating self-generated {ssl_cert} and {ssl_key}")
             generate_ssl_certkey(
                 "gluu_https",
                 self.ctx["secret"]["ssl_cert_pass"],
@@ -739,6 +778,7 @@ class CtxGenerator(object):
 
     def generate(self):
         self.base_ctx()
+        self.nginx_ctx()
         # raise click.Abort()
         self.ldap_ctx()
         self.redis_ctx()
@@ -748,7 +788,6 @@ class CtxGenerator(object):
         self.passport_rs_ctx()
         self.passport_rp_ctx()
         self.passport_sp_ctx()
-        self.nginx_ctx()
         self.oxshibboleth_ctx()
         self.oxtrust_api_rs_ctx()
         self.oxtrust_api_rp_ctx()
