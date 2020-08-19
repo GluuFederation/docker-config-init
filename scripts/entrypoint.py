@@ -515,7 +515,7 @@ class CtxGenerator(object):
                     # or generate empty file
                     with open(ssl_key, "w") as f:
                         f.write("")
-            except (socket.gaierror, socket.timeout, ConnectionRefusedError) as exc:
+            except (socket.gaierror, socket.timeout, ConnectionRefusedError, TimeoutError) as exc:
                 # address not resolved or timed out
                 logger.warning(f"Unable to download cert; reason={exc}")
             finally:
