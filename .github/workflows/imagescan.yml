@@ -11,6 +11,7 @@ jobs:
       with:
         image: "local/scanimage:latest"
         fail-build: true
+        severity-cutoff: critical
     - name: anchore inline scan JSON results
       run: for j in `ls ./anchore-reports/*.json`; do echo "---- ${j} ----"; cat ${j}; echo; done
     - uses: azure/container-scan@v0
