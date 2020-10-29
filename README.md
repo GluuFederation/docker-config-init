@@ -5,7 +5,7 @@ ConfigInit is a special container used to load (generate/restore) and dump (back
 ## Versions
 
 See [Releases](https://github.com/GluuFederation/docker-config-init/releases) for stable versions.
-For bleeding-edge/unstable version, use `gluufederation/config-init:4.2.1_dev`.
+For bleeding-edge/unstable version, use `gluufederation/config-init:4.2.2_dev`.
 
 ## Environment Variables
 
@@ -35,7 +35,7 @@ The following environment variables are supported by the container:
 - `GLUU_SECRET_VAULT_KEY_FILE`: path to Vault key file (default to `/etc/certs/vault_client.key`).
 - `GLUU_SECRET_VAULT_CACERT_FILE`: path to Vault CA cert file (default to `/etc/certs/vault_ca.crt`). This file will be used if it exists and `GLUU_SECRET_VAULT_VERIFY` set to `true`.
 - `GLUU_SECRET_KUBERNETES_NAMESPACE`: Kubernetes namespace (default to `default`).
-- `GLUU_SECRET_KUBERNETES_CONFIGMAP`: Kubernetes secrets name (default to `gluu`).
+- `GLUU_SECRET_KUBERNETES_SECRET`: Kubernetes secrets name (default to `gluu`).
 - `GLUU_SECRET_KUBERNETES_USE_KUBE_CONFIG`: Load credentials from `$HOME/.kube/config`, only useful for non-container environment (default to `false`).
 - `GLUU_WAIT_MAX_TIME`: How long the startup "health checks" should run (default to `300` seconds).
 - `GLUU_WAIT_SLEEP_DURATION`: Delay between startup "health checks" (default to `10` seconds).
@@ -82,7 +82,7 @@ The load command can be used either to generate or restore config and secret for
         -v /path/to/host/volume:/opt/config-init/db \
         -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
         -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-        gluufederation/config-init:4.2.1_02 load
+        gluufederation/config-init:4.2.2_dev load
     ```
 
 #### Kubernetes
@@ -126,7 +126,7 @@ The load command can be used either to generate or restore config and secret for
 	            name: config-generate-params
 	      containers:
 	        - name: config-init-load
-	          image: gluufederation/config-init:4.2.1_02
+	          image: gluufederation/config-init:4.2.2_dev
 	          volumeMounts:
 	            - mountPath: /opt/config-init/db/generate.json
 	              name: config-generate-params
@@ -166,7 +166,7 @@ The load command can be used either to generate or restore config and secret for
 	            name: secret-params
 	      containers:
 	        - name: config-init-load
-	          image: gluufederation/config-init:4.2.1_02
+	          image: gluufederation/config-init:4.2.2_dev
 	          volumeMounts:
 	            - mountPath: /opt/config-init/db/config.json
 	              name: config-params
@@ -200,7 +200,7 @@ docker run \
     -v /path/to/host/volume:/opt/config-init/db \
     -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
     -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-    gluufederation/config-init:4.2.1_02 dump
+    gluufederation/config-init:4.2.2_dev dump
 ```
 
 #### Kubernetes
@@ -216,7 +216,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: config-init-load
-          image: gluufederation/config-init:4.2.1_02
+          image: gluufederation/config-init:4.2.2_dev
           command:
             - /bin/sh
             - -c
@@ -231,3 +231,57 @@ spec:
 Copy over the files to host
 
 `kubectl cp config-init-load-job:opt/config-init/db .`
+<<<<<<< HEAD
+
+### migrate
+
+The migrate command exports secrets that were previously saved in the configuration backend into the secret backend.
+
+#### Docker
+
+```sh
+docker run \
+    --rm \
+    --network container:consul \
+    -e GLUU_CONFIG_ADAPTER=consul \
+    -e GLUU_CONFIG_CONSUL_HOST=consul \
+    -e GLUU_SECRET_ADAPTER=vault \
+    -e GLUU_SECRET_VAULT_HOST=vault \
+    -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
+    -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
+    gluufederation/config-init:4.2.0_01 migrate
+```
+
+#### Kubernetes
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: config-init-load-job
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: config-params
+          configMap:
+            name: config-params
+       	- name: secret-params
+          configMap:
+            name: secret-params
+      containers:
+        - name: config-init-load
+          image: gluufederation/config-init:4.2.0_01
+          volumeMounts:
+            - mountPath: /opt/config-init/db/config.json
+              name: config-params
+              subPath: config.json
+            - mountPath: /opt/config-init/db/secret.json
+              name: secret-params
+              subPath: secret.json
+          envFrom:
+          - configMapRef:
+              name: config-cm
+          args: ["migrate"]
+   ```
