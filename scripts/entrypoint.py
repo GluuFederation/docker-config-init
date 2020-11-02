@@ -65,6 +65,25 @@ def generate_openid_keys(passwd, jks_path, jwks_path, dn, exp=365, sig_keys=DEFA
     return out, err, retcode
 
 
+def generate_openid_keys_hourly(passwd, jks_path, jwks_path, dn, exp=48, sig_keys=DEFAULT_SIG_KEYS, enc_keys=DEFAULT_ENC_KEYS):
+    cmd = " ".join([
+        "java",
+        "-Dlog4j.defaultInitOverride=true",
+        "-jar", "/app/javalibs/oxauth-client.jar",
+        "-enc_keys", enc_keys,
+        "-sig_keys", sig_keys,
+        "-dnname", "{!r}".format(dn),
+        "-expiration_hours", "{}".format(exp),
+        "-keystore", jks_path,
+        "-keypasswd", passwd,
+    ])
+    out, err, retcode = exec_cmd(cmd)
+    if retcode == 0:
+        with open(jwks_path, "w") as f:
+            f.write(out.decode())
+    return out, err, retcode
+
+
 def export_openid_keys(keystore, keypasswd, alias, export_file):
     cmd = " ".join([
         "java",
@@ -260,12 +279,15 @@ class CtxGenerator(object):
         self._set_config("oxauth_legacyIdTokenClaims", "false")
         self._set_config("oxauth_openidScopeBackwardCompatibility", "false")
 
-        _, err, retcode = generate_openid_keys(
+        # default exp = 2 hours + token lifetime (in hour)
+        exp = int(2 + (3600 / 3600))
+
+        _, err, retcode = generate_openid_keys_hourly(
             self.ctx["secret"]["oxauth_openid_jks_pass"],
             self.ctx["config"]["oxauth_openid_jks_fn"],
             self.ctx["config"]["oxauth_openid_jwks_fn"],
             self.ctx["config"]["default_openid_jks_dn_name"],
-            exp=2,
+            exp=exp,
             sig_keys="RS256 RS384 RS512 ES256 ES384 ES512 PS256 PS384 PS512",
             enc_keys="RSA1_5 RSA-OAEP",
         )
