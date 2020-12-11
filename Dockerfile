@@ -110,7 +110,7 @@ LABEL name="ConfigInit" \
     maintainer="Gluu Inc. <support@gluu.org>" \
     vendor="Gluu Federation" \
     version="4.2.2" \
-    release="dev" \
+    release="01" \
     summary="Gluu ConfigInit" \
     description="Manage config and secret"
 
