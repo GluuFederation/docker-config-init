@@ -19,6 +19,7 @@ from pygluu.containerlib.utils import generate_base64_contents
 from pygluu.containerlib.utils import safe_render
 from pygluu.containerlib.utils import ldap_encode
 from pygluu.containerlib.utils import get_server_certificate
+from pygluu.containerlib.utils import generate_ssl_certkey
 
 from parameter import params_from_file
 from settings import LOGGING_CONFIG
@@ -215,13 +216,13 @@ class CtxGenerator(object):
 
         generate_ssl_certkey(
             "opendj",
-            self.ctx["secret"]["ldap_truststore_pass"],
             self.ctx["config"]["admin_email"],
             self.ctx["config"]["hostname"],
             self.ctx["config"]["orgName"],
             self.ctx["config"]["country_code"],
             self.ctx["config"]["state"],
             self.ctx["config"]["city"],
+            extra_dns=["ldap"],
         )
         with open("/etc/certs/opendj.pem", "w") as fw:
             with open("/etc/certs/opendj.crt") as fr:
@@ -483,7 +484,6 @@ class CtxGenerator(object):
 
         generate_ssl_certkey(
             "passport-sp",
-            self.ctx["secret"]["passportSpKeyPass"],
             self.ctx["config"]["admin_email"],
             self.ctx["config"]["hostname"],
             self.ctx["config"]["orgName"],
@@ -550,7 +550,6 @@ class CtxGenerator(object):
             logger.info(f"Creating self-generated {ssl_cert} and {ssl_key}")
             generate_ssl_certkey(
                 "gluu_https",
-                self.ctx["secret"]["ssl_cert_pass"],
                 self.ctx["config"]["admin_email"],
                 self.ctx["config"]["hostname"],
                 self.ctx["config"]["orgName"],
@@ -580,7 +579,6 @@ class CtxGenerator(object):
 
         generate_ssl_certkey(
             "shibIDP",
-            self.ctx["secret"]["shibJksPass"],
             self.ctx["config"]["admin_email"],
             self.ctx["config"]["hostname"],
             self.ctx["config"]["orgName"],
@@ -617,7 +615,6 @@ class CtxGenerator(object):
 
         generate_ssl_certkey(
             "idp-signing",
-            self.ctx["secret"]["shibJksPass"],
             self.ctx["config"]["admin_email"],
             self.ctx["config"]["hostname"],
             self.ctx["config"]["orgName"],
@@ -639,7 +636,6 @@ class CtxGenerator(object):
 
         generate_ssl_certkey(
             "idp-encryption",
-            self.ctx["secret"]["shibJksPass"],
             self.ctx["config"]["admin_email"],
             self.ctx["config"]["hostname"],
             self.ctx["config"]["orgName"],
@@ -821,56 +817,6 @@ class CtxGenerator(object):
         self.jackrabbit_ctx()
         # populated config
         return self.ctx
-
-
-def generate_ssl_certkey(suffix, passwd, email, hostname, org_name,
-                         country_code, state, city):
-    # create key with password
-    _, err, retcode = exec_cmd(" ".join([
-        "openssl",
-        "genrsa -des3",
-        "-out /etc/certs/{}.key.orig".format(suffix),
-        "-passout pass:'{}' 2048".format(passwd),
-    ]))
-    assert retcode == 0, "Failed to generate SSL key with password; reason={}".format(err)
-
-    # create .key
-    _, err, retcode = exec_cmd(" ".join([
-        "openssl",
-        "rsa",
-        "-in /etc/certs/{}.key.orig".format(suffix),
-        "-passin pass:'{}'".format(passwd),
-        "-out /etc/certs/{}.key".format(suffix),
-    ]))
-    assert retcode == 0, "Failed to generate SSL key; reason={}".format(err)
-
-    # create .csr
-    _, err, retcode = exec_cmd(" ".join([
-        "openssl",
-        "req",
-        "-new",
-        "-key /etc/certs/{}.key".format(suffix),
-        "-out /etc/certs/{}.csr".format(suffix),
-        """-subj /C="{}"/ST="{}"/L="{}"/O="{}"/CN="{}"/emailAddress='{}'""".format(country_code, state, city, org_name, hostname, email),
-
-    ]))
-    assert retcode == 0, "Failed to generate SSL CSR; reason={}".format(err)
-
-    # create .crt
-    _, err, retcode = exec_cmd(" ".join([
-        "openssl",
-        "x509",
-        "-req",
-        "-days 365",
-        "-in /etc/certs/{}.csr".format(suffix),
-        "-signkey /etc/certs/{}.key".format(suffix),
-        "-out /etc/certs/{}.crt".format(suffix),
-    ]))
-    assert retcode == 0, "Failed to generate SSL cert; reason={}".format(err)
-
-    # return the paths
-    return "/etc/certs/{}.crt".format(suffix), \
-           "/etc/certs/{}.key".format(suffix)
 
 
 def generate_keystore(suffix, hostname, keypasswd):
