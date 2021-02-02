@@ -11,7 +11,7 @@ RUN mkdir -p /usr/lib/jvm/default-jvm /usr/java/latest \
 
 RUN apk update \
     && apk add --no-cache openssl py3-pip curl tini \
-    && apk add --no-cache --virtual build-deps wget git
+    && apk add --no-cache --virtual build-deps wget git gcc musl-dev python3-dev libffi-dev openssl-dev
 
 # =============
 # oxAuth client
@@ -38,7 +38,6 @@ RUN mkdir -p /app/javalibs \
 # Python
 # ======
 
-RUN apk add --no-cache py3-cryptography py3-multidict py3-yarl
 COPY requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir -U pip \
     && pip3 install --no-cache-dir -r /app/requirements.txt \
