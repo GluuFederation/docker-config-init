@@ -29,6 +29,7 @@ DEFAULT_ENC_KEYS = DEFAULT_SIG_KEYS
 DEFAULT_CONFIG_FILE = "/app/db/config.json"
 DEFAULT_SECRET_FILE = "/app/db/secret.json"
 DEFAULT_GENERATE_FILE = "/app/db/generate.json"
+DEFAULT_MIGRATION_DIR = "/ce"
 
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger("config-init")
@@ -1004,44 +1005,38 @@ def cli():
 def load(generate_file, config_file, secret_file):
     """Loads config and secret from JSON files (generate if not exist).
     """
-    config_file_found = os.path.isfile(config_file)
-    secret_file_found = os.path.isfile(secret_file)
-    should_generate = False
-    params = {}
-
-    if not any([config_file_found, secret_file_found]):
-        should_generate = True
-        logger.warning("Unable to find {0} or {1}".format(config_file, secret_file))
-
-        logger.info("Loading parameters from {}".format(generate_file))
-
-        params, err, code = params_from_file(generate_file)
-        if code != 0:
-            logger.error("Unable to load generate parameters; reason={}".format(err))
-            raise click.Abort()
-
-    deps = ["config_conn", "secret_conn"]
-    wait_for(manager, deps=deps)
-
-    if should_generate:
-        logger.info("Generating config and secret.")
-
-        # tolerancy before checking existing key
-        time.sleep(5)
-
-        ctx_generator = CtxGenerator(manager, params)
-        ctx = ctx_generator.generate()
-
-        _save_generated_ctx(manager, ctx["config"], "config")
-        _dump_to_file(manager, config_file, "config")
-
-        _save_generated_ctx(manager, ctx["secret"], "secret")
-        _dump_to_file(manager, secret_file, "secret")
+    # check whether config and secret in backend have been initialized
+    if manager.config.get("hostname") and manager.secret.get("ssl_cert"):
+        # config and secret may have been initialized
+        logger.info("Config and secret have been initialized")
         return
 
-    # load from existing files
-    _load_from_file(manager, config_file, "config")
-    _load_from_file(manager, secret_file, "secret")
+    # there's no config and secret in backend, check whether to load from files
+    if os.path.isfile(config_file) and os.path.isfile(secret_file):
+        # load from existing files
+        logger.info(f"Re-using config and secret from {config_file} and {secret_file}")
+        _load_from_file(manager, config_file, "config")
+        _load_from_file(manager, secret_file, "secret")
+        return
+
+    # no existing files, hence generate new config and secret from parameters
+    logger.info(f"Loading parameters from {generate_file}")
+    params, err, code = params_from_file(generate_file)
+    if code != 0:
+        logger.error(f"Unable to load parameters; reason={err}")
+        raise click.Abort()
+
+    logger.info("Generating new config and secret")
+    ctx_generator = CtxGenerator(manager, params)
+    ctx = ctx_generator.generate()
+
+    # save config to its backend and file
+    _save_generated_ctx(manager, ctx["config"], "config")
+    _dump_to_file(manager, config_file, "config")
+
+    # save secret to its backend and file
+    _save_generated_ctx(manager, ctx["secret"], "secret")
+    _dump_to_file(manager, secret_file, "secret")
 
 
 @cli.command()
@@ -1067,6 +1062,54 @@ def dump(config_file, secret_file):
 
     _dump_to_file(manager, config_file, "config")
     _dump_to_file(manager, secret_file, "secret")
+
+
+@cli.command()
+@click.option(
+    "--migration-dir",
+    type=click.Path(exists=False),
+    help="Absolute path to directory contains manifests from Community Edition",
+    default=DEFAULT_MIGRATION_DIR,
+    show_default=True,
+)
+@click.option(
+    "--backend",
+    type=click.Choice(["ldif", "json"]),
+    help="Backend to load extra config and secret not found in setup.properties",
+    default="ldif",
+)
+def migrate(migration_dir, backend):
+    """Loads config and secret from Community Edition manifests.
+    """
+    from ce_migrator import CtxMigrator
+
+    deps = ["config_conn", "secret_conn"]
+    wait_for(manager, deps=deps)
+
+    migrator = CtxMigrator(migration_dir, backend)
+    ctx = migrator.migrate()
+
+    config_file = "/app/db/config.json"
+    logger.info(f"Saving migrated config to {config_file}")
+    with open(config_file, "w") as f:
+        f.write(json.dumps(
+            {"_config": ctx["_config"]},
+            sort_keys=True,
+            indent=4,
+        ))
+
+    secret_file = "/app/db/secret.json"
+    logger.info(f"Saving migrated secret to {secret_file}")
+    with open(secret_file, "w") as f:
+        f.write(json.dumps(
+            {"_secret": ctx["_secret"]},
+            sort_keys=True,
+            indent=4,
+        ))
+
+    # load from existing files
+    _load_from_file(manager, config_file, "config")
+    _load_from_file(manager, secret_file, "secret")
 
 
 if __name__ == "__main__":
