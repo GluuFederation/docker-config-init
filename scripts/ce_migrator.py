@@ -99,59 +99,50 @@ class LdifBackend:
     def get_oxauth_jwks(self) -> str:
         jwks = ""
         with open(self.source_file, "rb") as fd:
-            # with contextlib.ExitStack() as stack:
-            # fd = stack.enter_context(open(self.source_file, "rb"))
             parser = LDIFParser(fd)
 
             for dn, entry in parser.parse():
-                if dn != "ou=oxauth,ou=configuration,o=gluu":
-                    continue
-                jwks = entry["oxAuthConfWebKeys"][0]
+                if dn.startswith("ou=oxauth,ou=configuration"):
+                    jwks = entry["oxAuthConfWebKeys"][0]
+                    break
         return jwks
 
     def get_client_jwks(self, id_) -> str:
         jwks = ""
         with open(self.source_file, "rb") as fd:
-            # with contextlib.ExitStack() as stack:
-            # fd = stack.enter_context(open(self.source_file, "rb"))
             parser = LDIFParser(fd)
 
             for dn, entry in parser.parse():
-                if dn != f"inum={id_},ou=clients,o=gluu":
-                    continue
-                jwks = entry["oxAuthJwks"][0]
+                if dn.startswith(f"inum={id_},ou=clients"):
+                    jwks = entry["oxAuthJwks"][0]
+                    break
         return jwks
 
     def get_cache_config(self) -> dict:
         config = {}
-
         with open(self.source_file, "rb") as fd:
-            # with contextlib.ExitStack() as stack:
-            # fd = stack.enter_context(open(self.source_file, "rb"))
             parser = LDIFParser(fd)
 
             for dn, entry in parser.parse():
-                if dn != "ou=configuration,o=gluu":
-                    continue
-                config = json.loads(entry["oxCacheConfiguration"][0])
+                if dn.startswith("ou=configuration"):
+                    config = json.loads(entry["oxCacheConfiguration"][0])
+                    break
         return config
 
 
 class JsonBackend:
     def __init__(self, source_file):
         self.source_file = source_file
-        self.bucket_prefix = os.environ.get("GLUU_COUCHBASE_BUCKET_PREFIX", "gluu")
 
     def get_oxauth_jwks(self) -> str:
         jwks = ""
-
         with open(self.source_file) as f:
             data = json.load(f)
 
             for item in data:
-                if item["dn"] != f"ou=oxauth,ou=configuration,o={self.bucket_prefix}":
-                    continue
-                jwks = json.dumps(item["oxAuthConfWebKeys"])
+                if item["dn"].startswith("ou=oxauth,ou=configuration"):
+                    jwks = json.dumps(item["oxAuthConfWebKeys"])
+                    break
         return jwks
 
     def get_client_jwks(self, id_) -> str:
@@ -160,9 +151,9 @@ class JsonBackend:
             data = json.load(f)
 
             for item in data:
-                if item["dn"] != f"inum={id_},ou=clients,o={self.bucket_prefix}":
-                    continue
-                jwks = json.dumps(item["oxAuthJwks"])
+                if item["dn"].startswith(f"inum={id_},ou=clients"):
+                    jwks = json.dumps(item["oxAuthJwks"])
+                    break
         return jwks
 
     def get_cache_config(self) -> dict:
@@ -171,9 +162,9 @@ class JsonBackend:
             data = json.load(f)
 
             for item in data:
-                if item["dn"] != f"ou=configuration,o={self.bucket_prefix}":
-                    continue
-                config = item["oxCacheConfiguration"]
+                if item["dn"].startswith("ou=configuration"):
+                    config = item["oxCacheConfiguration"]
+                    break
         return config
 
 
