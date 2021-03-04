@@ -656,7 +656,7 @@ class CtxGenerator(object):
 
         _, err, code = gen_idp3_key(self.ctx["secret"]["shibJksPass"])
         if code != 0:
-            logger.warninging(f"Unable to generate Shibboleth sealer; reason={err}")
+            logger.warning(f"Unable to generate Shibboleth sealer; reason={err}")
             raise click.Abort()
 
         with open("/etc/certs/sealer.jks", "rb") as f:
