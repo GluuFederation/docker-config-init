@@ -5,7 +5,7 @@ ConfigInit is a special container used to load (generate/restore) and dump (back
 ## Versions
 
 See [Releases](https://github.com/GluuFederation/docker-config-init/releases) for stable versions.
-For bleeding-edge/unstable version, use `gluufederation/config-init:4.2.3_dev`.
+For bleeding-edge/unstable version, use `gluufederation/config-init:4.3.0_dev`.
 
 ## Environment Variables
 
@@ -82,7 +82,7 @@ The load command can be used either to generate or restore config and secret for
         -v /path/to/host/volume:/opt/config-init/db \
         -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
         -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-        gluufederation/config-init:4.2.3_dev load
+        gluufederation/config-init:4.3.0_dev load
     ```
 
 #### Kubernetes
@@ -126,7 +126,7 @@ The load command can be used either to generate or restore config and secret for
 	            name: config-generate-params
 	      containers:
 	        - name: config-init-load
-	          image: gluufederation/config-init:4.2.3_dev
+	          image: gluufederation/config-init:4.3.0_dev
 	          volumeMounts:
 	            - mountPath: /opt/config-init/db/generate.json
 	              name: config-generate-params
@@ -166,7 +166,7 @@ The load command can be used either to generate or restore config and secret for
 	            name: secret-params
 	      containers:
 	        - name: config-init-load
-	          image: gluufederation/config-init:4.2.3_dev
+	          image: gluufederation/config-init:4.3.0_dev
 	          volumeMounts:
 	            - mountPath: /opt/config-init/db/config.json
 	              name: config-params
@@ -200,7 +200,7 @@ docker run \
     -v /path/to/host/volume:/opt/config-init/db \
     -v /path/to/vault_role_id.txt:/etc/certs/vault_role_id \
     -v /path/to/vault_secret_id.txt:/etc/certs/vault_secret_id \
-    gluufederation/config-init:4.2.3_dev dump
+    gluufederation/config-init:4.3.0_dev dump
 ```
 
 #### Kubernetes
@@ -216,7 +216,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: config-init-load
-          image: gluufederation/config-init:4.2.3_dev
+          image: gluufederation/config-init:4.3.0_dev
           command:
             - /bin/sh
             - -c
