@@ -3,6 +3,7 @@ import logging.config
 import os
 import random
 import socket
+import ssl
 import time
 import uuid
 
@@ -115,7 +116,7 @@ def generate_pkcs12(suffix, passwd, hostname):
     assert retcode == 0, "Failed to generate PKCS12 file; reason={}".format(err)
 
 
-class CtxManager(object):
+class CtxManager:
     def __init__(self, manager):
         self.manager = manager
         self.ctx = {"config": {}, "secret": {}}
@@ -167,7 +168,7 @@ class CtxManager(object):
         return value
 
 
-class CtxGenerator(object):
+class CtxGenerator:
     def __init__(self, manager, params):
         self.params = params
         self.manager = manager
@@ -538,7 +539,7 @@ class CtxGenerator(object):
                     with open(ssl_key, "w") as f:
                         f.write("")
             except (socket.gaierror, socket.timeout, ConnectionRefusedError,
-                    TimeoutError, ConnectionResetError) as exc:
+                    TimeoutError, ConnectionResetError, ssl.SSLEOFError) as exc:
                 # address not resolved or timed out
                 logger.warning(f"Unable to download cert; reason={exc}")
             finally:
@@ -950,44 +951,41 @@ def cli():
 def load(generate_file, config_file, secret_file):
     """Loads config and secret from JSON files (generate if not exist).
     """
-    config_file_found = os.path.isfile(config_file)
-    secret_file_found = os.path.isfile(secret_file)
-    should_generate = False
-    params = {}
-
-    if not any([config_file_found, secret_file_found]):
-        should_generate = True
-        logger.warning("Unable to find {0} or {1}".format(config_file, secret_file))
-
-        logger.info("Loading parameters from {}".format(generate_file))
-
-        params, err, code = params_from_file(generate_file)
-        if code != 0:
-            logger.error("Unable to load generate parameters; reason={}".format(err))
-            raise click.Abort()
-
     deps = ["config_conn", "secret_conn"]
     wait_for(manager, deps=deps)
 
-    if should_generate:
-        logger.info("Generating config and secret.")
-
-        # tolerancy before checking existing key
-        time.sleep(5)
-
-        ctx_generator = CtxGenerator(manager, params)
-        ctx = ctx_generator.generate()
-
-        _save_generated_ctx(manager, ctx["config"], "config")
-        _dump_to_file(manager, config_file, "config")
-
-        _save_generated_ctx(manager, ctx["secret"], "secret")
-        _dump_to_file(manager, secret_file, "secret")
+    # check whether config and secret in backend have been initialized
+    if manager.config.get("hostname") and manager.secret.get("ssl_cert"):
+        # config and secret may have been initialized
+        logger.info("Config and secret have been initialized")
         return
 
-    # load from existing files
-    _load_from_file(manager, config_file, "config")
-    _load_from_file(manager, secret_file, "secret")
+    # there's no config and secret in backend, check whether to load from files
+    if os.path.isfile(config_file) and os.path.isfile(secret_file):
+        # load from existing files
+        logger.info(f"Re-using config and secret from {config_file} and {secret_file}")
+        _load_from_file(manager, config_file, "config")
+        _load_from_file(manager, secret_file, "secret")
+        return
+
+    # no existing files, hence generate new config and secret from parameters
+    logger.info(f"Loading parameters from {generate_file}")
+    params, err, code = params_from_file(generate_file)
+    if code != 0:
+        logger.error(f"Unable to load parameters; reason={err}")
+        raise click.Abort()
+
+    logger.info("Generating new config and secret")
+    ctx_generator = CtxGenerator(manager, params)
+    ctx = ctx_generator.generate()
+
+    # save config to its backend and file
+    _save_generated_ctx(manager, ctx["config"], "config")
+    _dump_to_file(manager, config_file, "config")
+
+    # save secret to its backend and file
+    _save_generated_ctx(manager, ctx["secret"], "secret")
+    _dump_to_file(manager, secret_file, "secret")
 
 
 @cli.command()
