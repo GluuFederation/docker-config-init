@@ -174,11 +174,11 @@ class CtxMigrator:
 
         if backend == "ldif":
             self.backend = LdifBackend(
-                os.path.join(self.migration_dir, "source.ldif"),
+                os.path.join(self.migration_dir, "backend.ldif"),
             )
         else:
             self.backend = JsonBackend(
-                os.path.join(self.migration_dir, "source.json"),
+                os.path.join(self.migration_dir, "backend.json"),
             )
 
         with open(os.path.join(self.migration_dir, "setup.properties")) as f:
